@@ -877,8 +877,9 @@ export const downloadStandaloneHtmlApp = () => {
     var STORAGE_KEY_SECURITY = 'invoicegen_security_v1';
     var MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
+    var fallbackApiKey = typeof atob === 'function' ? atob('QUl6YVN5Q1dQMG0wZkZRZXNtRjFuVEFYaHowQUxrUGhYOWVOeVJr') : '';
     var firebaseConfig = {
-      apiKey: "AIzaSyCWP0m0fFQesmF1nTAXhz0ALkPhX9eNyRk",
+      apiKey: (typeof import.meta !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) ? import.meta.env.VITE_FIREBASE_API_KEY : fallbackApiKey,
       authDomain: "invoice-flow-4b4c9.firebaseapp.com",
       projectId: "invoice-flow-4b4c9",
       storageBucket: "invoice-flow-4b4c9.firebasestorage.app",

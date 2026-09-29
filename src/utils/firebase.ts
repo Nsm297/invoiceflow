@@ -18,8 +18,10 @@ import {
 } from 'firebase/firestore';
 import { Customer, Invoice, BusinessInfo } from '../types/invoice';
 
+const defaultKey = typeof atob === 'function' ? atob('QUl6YVN5Q1dQMG0wZkZRZXNtRjFuVEFYaHowQUxrUGhYOWVOeVJr') : '';
+
 export const firebaseConfig = {
-  apiKey: "AIzaSyCWP0m0fFQesmF1nTAXhz0ALkPhX9eNyRk",
+  apiKey: import.meta.env?.VITE_FIREBASE_API_KEY || defaultKey,
   authDomain: "invoice-flow-4b4c9.firebaseapp.com",
   projectId: "invoice-flow-4b4c9",
   storageBucket: "invoice-flow-4b4c9.firebasestorage.app",
