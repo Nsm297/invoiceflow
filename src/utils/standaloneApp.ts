@@ -878,12 +878,12 @@ export const downloadStandaloneHtmlApp = () => {
     var MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
     var firebaseConfig = {
-      apiKey: "AIzaSyCWP0m0fF0esmF1nTAXhz0ALkPhX9eNyRk",
+      apiKey: "AIzaSyCWP0m0fFQesmF1nTAXhz0ALkPhX9eNyRk",
       authDomain: "invoice-flow-4b4c9.firebaseapp.com",
       projectId: "invoice-flow-4b4c9",
       storageBucket: "invoice-flow-4b4c9.firebasestorage.app",
       messagingSenderId: "746068664458",
-      appId: "1:746068664458:web:0d6a81e9412c4693778d73"
+      appId: "1:746068664458:web:0d8a81e9412c4693778d73"
     };
 
     var firebaseApp = null;
