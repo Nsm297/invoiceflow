@@ -1,0 +1,6 @@
+{
+  "name": "InvoiceFlow",
+  "description": "Mobile-responsive full-stack invoice generator with client management, PDF print export, invoice history, and monthly & yearly financial statements.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
