@@ -201,7 +201,13 @@ export default function App() {
     } catch (err: any) {
       console.error('Google Sign-in failed:', err);
       if (err?.code !== 'auth/popup-closed-by-user') {
-        showToast('error', 'Google Sign-In Failed', err?.message || 'Authentication error.');
+        let msg = err?.message || 'Authentication error.';
+        if (err?.code === 'auth/api-key-not-valid') {
+          msg = 'Firebase API Key is invalid or expired. Check Firebase Console Authentication settings.';
+        } else if (err?.code === 'auth/unauthorized-domain') {
+          msg = 'This domain is not authorized in Firebase Console -> Authentication -> Settings -> Authorized domains.';
+        }
+        showToast('error', 'Google Sign-In Failed', msg);
       }
     }
   };
