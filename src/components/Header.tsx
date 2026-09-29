@@ -1,6 +1,7 @@
 import React from 'react';
 import { User } from 'firebase/auth';
 import { TabType } from '../types/invoice';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   currentTab: TabType;
@@ -127,6 +128,9 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right side: Google Auth Status + Primary Action Button + Quick Lock Button */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Install PWA Button */}
+          <PWAInstallButton compact />
+
           {/* Google Auth Status / Button */}
           {user ? (
             <div className="flex items-center gap-1.5 bg-slate-100/90 border border-slate-200 px-2 py-1 rounded-lg">

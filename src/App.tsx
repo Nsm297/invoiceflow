@@ -39,6 +39,7 @@ import { InvoicePrintModal } from './components/InvoicePrintModal';
 import { StoreInfoModule } from './components/StoreInfoModule';
 import { SecurityLockScreen } from './components/SecurityLockScreen';
 import { ToastContainer, ToastMessage } from './components/Toast';
+import { OfflineIndicator } from './components/OfflineIndicator';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<TabType>('create');
@@ -783,6 +784,9 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Connectivity & Offline Status Indicator */}
+      <OfflineIndicator />
     </div>
   );
 }

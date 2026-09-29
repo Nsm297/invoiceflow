@@ -3,6 +3,7 @@ import { User } from 'firebase/auth';
 import { BusinessInfo, SecurityConfig } from '../types/invoice';
 import { DEFAULT_BUSINESS_INFO } from '../utils/storage';
 import { isBiometricSupported, registerBiometrics } from '../utils/security';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface StoreInfoModuleProps {
   businessInfo: BusinessInfo;
@@ -987,14 +988,20 @@ export const StoreInfoModule: React.FC<StoreInfoModuleProps> = ({
               </div>
             </div>
 
-            <div className="bg-emerald-50/80 border border-emerald-200 p-4 rounded-xl space-y-2 text-xs text-emerald-950">
-              <h4 className="font-bold flex items-center gap-1.5 text-emerald-900">
-                <i className="fa-solid fa-circle-check text-emerald-700"></i>
-                <span>Offline First + Cloud Sync</span>
-              </h4>
-              <p className="text-[11px] text-emerald-800">
-                Even without an internet connection, all features, invoices, customer statements, and PDF exports continue to work seamlessly from your local browser cache. Once connected, your data automatically synchronizes with Firestore.
+            <div className="bg-emerald-50/80 border border-emerald-200 p-4 rounded-xl space-y-3 text-xs text-emerald-950">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold flex items-center gap-1.5 text-emerald-900">
+                  <i className="fa-solid fa-circle-check text-emerald-700"></i>
+                  <span>Progressive Web App (PWA)</span>
+                </h4>
+                <span className="text-[10px] bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-full font-bold">Installable</span>
+              </div>
+              <p className="text-[11px] text-emerald-800 leading-relaxed">
+                Install InvoiceFlow directly on your phone, tablet, or PC for full-screen standalone usage, instant access from your home screen, and offline ledger capabilities.
               </p>
+              <div className="pt-1">
+                <PWAInstallButton className="w-full justify-center" />
+              </div>
             </div>
           </div>
         </div>
