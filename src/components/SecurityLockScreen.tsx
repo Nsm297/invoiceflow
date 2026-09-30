@@ -73,7 +73,9 @@ export const SecurityLockScreen: React.FC<SecurityLockScreenProps> = ({
         setErrorMessage(result.error);
       }
     } catch {
-      setErrorMessage('No fingerprint registered on this device yet. Please unlock using PIN first, then enable Biometrics in settings.');
+      setErrorMessage(
+        'No fingerprint registered for this device yet. Please unlock using your 4-digit PIN first, then register your fingerprint in Settings.'
+      );
     } finally {
       setIsBiometricPrompting(false);
     }

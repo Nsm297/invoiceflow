@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { BusinessInfo, SecurityConfig } from '../types/invoice';
 import { DEFAULT_BUSINESS_INFO } from '../utils/storage';
-import { isBiometricSupported, registerBiometrics } from '../utils/security';
+import {
+  isBiometricSupported,
+  registerBiometrics,
+  authenticateBiometrics,
+  hasDevicePasskey,
+} from '../utils/security';
 import { PWAInstallButton } from './PWAInstallButton';
 
 interface StoreInfoModuleProps {
@@ -152,6 +157,40 @@ export const StoreInfoModule: React.FC<StoreInfoModuleProps> = ({
     }
   };
 
+  const handleRegisterPasskey = async () => {
+    if (!securityConfig.pinEnabled) {
+      setSecurityMessage({ type: 'error', text: 'Please set a 4-digit PIN first before registering a Passkey.' });
+      return;
+    }
+
+    setSecurityMessage({ type: 'info', text: 'Registering biometric authenticator / passkey with your device...' });
+    const res = await registerBiometrics(businessInfo.name || 'InvoiceFlow');
+    if (res.success) {
+      const updatedConfig: SecurityConfig = {
+        ...securityConfig,
+        biometricEnabled: true,
+        credentialId: res.credentialId,
+      };
+      onSaveSecurityConfig(updatedConfig);
+      setSecurityMessage({
+        type: 'success',
+        text: 'Fingerprint / Passkey registered successfully on this device! You can now unlock using biometrics.',
+      });
+    } else {
+      setSecurityMessage({ type: 'error', text: res.error || 'Could not register biometric passkey.' });
+    }
+  };
+
+  const handleTestBiometrics = async () => {
+    setSecurityMessage({ type: 'info', text: 'Prompting for biometric verification...' });
+    const res = await authenticateBiometrics(businessInfo.name || 'InvoiceFlow');
+    if (res.success) {
+      setSecurityMessage({ type: 'success', text: 'Biometric verification passed successfully!' });
+    } else {
+      setSecurityMessage({ type: 'error', text: res.error || 'Biometric verification failed.' });
+    }
+  };
+
   const handleToggleBiometrics = async () => {
     if (!securityConfig.pinEnabled) {
       setSecurityMessage({ type: 'error', text: 'Please set a 4-digit PIN first before enabling Biometrics.' });
@@ -159,19 +198,7 @@ export const StoreInfoModule: React.FC<StoreInfoModuleProps> = ({
     }
 
     if (!securityConfig.biometricEnabled) {
-      setSecurityMessage({ type: 'info', text: 'Registering biometric authenticator with your browser...' });
-      const res = await registerBiometrics(businessInfo.name || 'InvoiceFlow');
-      if (res.success) {
-        const updatedConfig: SecurityConfig = {
-          ...securityConfig,
-          biometricEnabled: true,
-          credentialId: res.credentialId,
-        };
-        onSaveSecurityConfig(updatedConfig);
-        setSecurityMessage({ type: 'success', text: 'Biometric / Fingerprint Unlock enabled successfully!' });
-      } else {
-        setSecurityMessage({ type: 'error', text: res.error || 'Could not register biometric key.' });
-      }
+      await handleRegisterPasskey();
     } else {
       const updatedConfig: SecurityConfig = {
         ...securityConfig,
@@ -655,14 +682,14 @@ export const StoreInfoModule: React.FC<StoreInfoModuleProps> = ({
                   </div>
                 </form>
 
-                {/* Biometric Toggle Card */}
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                {/* Biometric & Passkey Registration Card */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
                         <i className="fa-solid fa-fingerprint text-emerald-700 text-base"></i>
                         <h4 className="text-xs font-bold text-slate-900">
-                          Biometric / Fingerprint Unlock
+                          Biometric / Passkey Authentication
                         </h4>
                       </div>
                       <p className="text-[11px] text-slate-600">
@@ -683,6 +710,7 @@ export const StoreInfoModule: React.FC<StoreInfoModuleProps> = ({
                       }`}
                       role="switch"
                       aria-checked={securityConfig.biometricEnabled}
+                      title={securityConfig.biometricEnabled ? 'Disable Biometrics' : 'Enable Biometrics'}
                     >
                       <span
                         aria-hidden="true"
@@ -691,6 +719,55 @@ export const StoreInfoModule: React.FC<StoreInfoModuleProps> = ({
                         }`}
                       />
                     </button>
+                  </div>
+
+                  {/* Device Passkey Registration & Actions */}
+                  <div className="pt-2 border-t border-slate-200/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                          securityConfig.biometricEnabled && hasDevicePasskey()
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        <i
+                          className={`fa-solid ${
+                            securityConfig.biometricEnabled && hasDevicePasskey()
+                              ? 'fa-circle-check text-emerald-600'
+                              : 'fa-circle-exclamation text-slate-500'
+                          } text-[10px]`}
+                        ></i>
+                        {securityConfig.biometricEnabled && hasDevicePasskey()
+                          ? 'Passkey Registered on this Device'
+                          : 'No Passkey Saved on this Device'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleRegisterPasskey}
+                        className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold shadow-xs transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                      >
+                        <i className="fa-solid fa-fingerprint text-xs"></i>
+                        <span>
+                          {hasDevicePasskey() ? 'Re-register Passkey' : 'Register Fingerprint / Passkey'}
+                        </span>
+                      </button>
+
+                      {securityConfig.biometricEnabled && hasDevicePasskey() && (
+                        <button
+                          type="button"
+                          onClick={handleTestBiometrics}
+                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold border border-slate-300 transition-colors flex items-center justify-center gap-1"
+                          title="Test biometric sensor prompt"
+                        >
+                          <i className="fa-solid fa-check text-[10px]"></i>
+                          <span>Test</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

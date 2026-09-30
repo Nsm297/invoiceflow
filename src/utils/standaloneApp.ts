@@ -1032,7 +1032,7 @@ export const downloadStandaloneHtmlApp = () => {
 
     async function triggerWebAuthnBiometric() {
       if (!window.PublicKeyCredential || !navigator.credentials) {
-        document.getElementById('lockScreenError').innerText = 'Biometric WebAuthn not supported on this browser.';
+        document.getElementById('lockScreenError').innerText = 'No fingerprint registered for this device yet. Please unlock using your 4-digit PIN first, then register your fingerprint in Settings.';
         return;
       }
       try {
@@ -1044,9 +1044,12 @@ export const downloadStandaloneHtmlApp = () => {
         });
         if (assertion) {
           unlockApp();
+        } else {
+          document.getElementById('lockScreenError').innerText = 'No fingerprint registered for this device yet. Please unlock using your 4-digit PIN first, then register your fingerprint in Settings.';
         }
       } catch (err) {
-        document.getElementById('lockScreenError').innerText = 'Biometric verification cancelled.';
+        var msg = (err && err.name === 'AbortError') ? 'Biometric scan cancelled.' : 'No fingerprint registered for this device yet. Please unlock using your 4-digit PIN first, then register your fingerprint in Settings.';
+        document.getElementById('lockScreenError').innerText = msg;
       }
     }
 

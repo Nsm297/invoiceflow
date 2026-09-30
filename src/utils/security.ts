@@ -1,6 +1,7 @@
 import { SecurityConfig } from '../types/invoice';
 
 const STORAGE_KEY_SECURITY = 'invoicegen_security_v1';
+const STORAGE_KEY_PASSKEY_FLAG = 'invoicegen_device_has_passkey';
 
 export const DEFAULT_SECURITY_CONFIG: SecurityConfig = {
   pinEnabled: false,
@@ -8,6 +9,20 @@ export const DEFAULT_SECURITY_CONFIG: SecurityConfig = {
   biometricEnabled: false,
   credentialId: undefined,
   autoLockOnIdle: false,
+};
+
+export const hasDevicePasskey = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(STORAGE_KEY_PASSKEY_FLAG) === 'true';
+};
+
+export const setDevicePasskeyRegistered = (registered: boolean): void => {
+  if (typeof window === 'undefined') return;
+  if (registered) {
+    localStorage.setItem(STORAGE_KEY_PASSKEY_FLAG, 'true');
+  } else {
+    localStorage.removeItem(STORAGE_KEY_PASSKEY_FLAG);
+  }
 };
 
 export const getStoredSecurityConfig = (): SecurityConfig => {
@@ -32,6 +47,9 @@ export const getStoredSecurityConfig = (): SecurityConfig => {
 export const saveStoredSecurityConfig = (config: SecurityConfig): void => {
   try {
     localStorage.setItem(STORAGE_KEY_SECURITY, JSON.stringify(config));
+    if (!config.biometricEnabled) {
+      setDevicePasskeyRegistered(false);
+    }
   } catch (err) {
     console.error('Failed to save security config:', err);
   }
@@ -58,9 +76,14 @@ export const isBiometricSupported = async (): Promise<boolean> => {
 /**
  * Registers WebAuthn platform authenticator (TouchID / FaceID / Android Fingerprint)
  */
-export const registerBiometrics = async (rpName: string = 'InvoiceFlow'): Promise<{ success: boolean; credentialId?: string; error?: string }> => {
+export const registerBiometrics = async (
+  rpName: string = 'InvoiceFlow'
+): Promise<{ success: boolean; credentialId?: string; error?: string }> => {
   if (typeof window === 'undefined' || !navigator.credentials) {
-    return { success: false, error: 'Biometric authentication (WebAuthn) is not supported in this browser.' };
+    return {
+      success: false,
+      error: 'Biometric authentication (WebAuthn) is not supported in this browser.',
+    };
   }
 
   try {
@@ -99,10 +122,10 @@ export const registerBiometrics = async (rpName: string = 'InvoiceFlow'): Promis
     };
 
     const credential = (await navigator.credentials.create(options)) as PublicKeyCredential | null;
-    if (credential && credential.id) {
-      return { success: true, credentialId: credential.id };
-    }
-    return { success: true, credentialId: 'biometric-active' };
+    const credId = (credential && credential.id) ? credential.id : 'device-passkey-active';
+    setDevicePasskeyRegistered(true);
+
+    return { success: true, credentialId: credId };
   } catch (err: any) {
     console.warn('WebAuthn registration error:', err);
     const errName = err?.name || '';
@@ -110,12 +133,6 @@ export const registerBiometrics = async (rpName: string = 'InvoiceFlow'): Promis
 
     if (errName === 'AbortError' || errMsg.includes('cancel') || errMsg.includes('abort')) {
       return { success: false, error: 'Biometric registration was cancelled.' };
-    }
-    if (errName === 'NotAllowedError' || errMsg.includes('not allowed') || errMsg.includes('timed out')) {
-      return {
-        success: false,
-        error: 'Biometric registration timed out or was dismissed. Please try again.',
-      };
     }
     return {
       success: false,
@@ -127,19 +144,24 @@ export const registerBiometrics = async (rpName: string = 'InvoiceFlow'): Promis
 /**
  * Prompts user for biometric verification (Fingerprint / Face ID)
  */
-export const authenticateBiometrics = async (rpName: string = 'InvoiceFlow'): Promise<{ success: boolean; error?: string }> => {
+export const authenticateBiometrics = async (
+  rpName: string = 'InvoiceFlow'
+): Promise<{ success: boolean; error?: string }> => {
+  const defaultFriendlyError =
+    'No fingerprint registered for this device yet. Please unlock using your 4-digit PIN first, then register your fingerprint in Settings.';
+
   if (typeof window === 'undefined' || !navigator.credentials) {
     return {
       success: false,
-      error: 'No fingerprint registered on this device yet. Please unlock using PIN first, then enable Biometrics in settings.',
+      error: defaultFriendlyError,
     };
   }
 
   const config = getStoredSecurityConfig();
-  if (!config.biometricEnabled) {
+  if (!config.biometricEnabled && !hasDevicePasskey()) {
     return {
       success: false,
-      error: 'No fingerprint registered on this device yet. Please unlock using PIN first, then enable Biometrics in settings.',
+      error: defaultFriendlyError,
     };
   }
 
@@ -165,10 +187,10 @@ export const authenticateBiometrics = async (rpName: string = 'InvoiceFlow'): Pr
     }
     return {
       success: false,
-      error: 'No fingerprint registered on this device yet. Please unlock using PIN first, then enable Biometrics in settings.',
+      error: defaultFriendlyError,
     };
   } catch (err: any) {
-    console.warn('Biometric unlock check:', err);
+    console.warn('Biometric unlock check caught:', err);
     const errName = err?.name || '';
     const errMsg = (err?.message || '').toLowerCase();
 
@@ -176,10 +198,10 @@ export const authenticateBiometrics = async (rpName: string = 'InvoiceFlow'): Pr
       return { success: false, error: 'Biometric scan cancelled.' };
     }
 
-    // Handle "No passkeys available", "operation timed out/not allowed", or missing credentials cleanly without W3C raw errors
+    // Gracefully handle NotAllowedError, NotFoundError, InvalidStateError, or no passkeys found
     return {
       success: false,
-      error: 'No fingerprint registered on this device yet. Please unlock using PIN first, then enable Biometrics in settings.',
+      error: defaultFriendlyError,
     };
   }
 };
