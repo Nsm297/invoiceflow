@@ -1,9 +1,10 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
+  initializeAuth,
   getAuth,
   setPersistence,
-  browserLocalPersistence,
   indexedDBLocalPersistence,
+  browserLocalPersistence,
   GoogleAuthProvider,
   signInWithPopup,
   signInWithRedirect,
@@ -35,19 +36,19 @@ export const firebaseConfig = {
 
 // Initialize Firebase App
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-export const auth = getAuth(app);
-export const db = getFirestore(app);
 
-// Explicitly set Firebase Auth persistence to browserLocalPersistence to prevent session loss on refresh
-if (typeof window !== 'undefined') {
-  setPersistence(auth, browserLocalPersistence)
-    .catch((error) => {
-      console.warn('Failed to set browserLocalPersistence, trying indexedDB fallback:', error);
-      setPersistence(auth, indexedDBLocalPersistence).catch((fallbackError) => {
-        console.error('Failed to set auth persistence fallback:', fallbackError);
-      });
+// Configure Firebase Auth to strictly maintain local session persistence
+export const auth = (() => {
+  try {
+    return initializeAuth(app, {
+      persistence: [indexedDBLocalPersistence, browserLocalPersistence],
     });
-}
+  } catch {
+    return getAuth(app);
+  }
+})();
+
+export const db = getFirestore(app);
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({

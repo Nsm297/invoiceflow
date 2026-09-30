@@ -18,6 +18,7 @@ interface StoreInfoModuleProps {
   onNavigateToCreate: () => void;
   onLockApp: () => void;
   user: User | null;
+  authLoading?: boolean;
   isSyncing?: boolean;
   lastSyncedTime?: string | null;
   onGoogleSignIn: () => void;
@@ -34,6 +35,7 @@ export const StoreInfoModule: React.FC<StoreInfoModuleProps> = ({
   onNavigateToCreate,
   onLockApp,
   user,
+  authLoading,
   isSyncing,
   lastSyncedTime,
   onGoogleSignIn,
@@ -862,16 +864,24 @@ export const StoreInfoModule: React.FC<StoreInfoModuleProps> = ({
               </h3>
               <span
                 className={`text-[11px] font-bold px-2 py-0.5 rounded ${
-                  user
+                  authLoading
+                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                    : user
                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                     : 'bg-slate-100 text-slate-600 border border-slate-200'
                 }`}
               >
-                {user ? 'CONNECTED' : 'LOCAL ONLY'}
+                {authLoading ? 'CHECKING SESSION...' : user ? 'CONNECTED' : 'LOCAL ONLY'}
               </span>
             </div>
 
-            {user ? (
+            {authLoading ? (
+              <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                <div className="w-7 h-7 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                <p className="text-xs font-semibold text-slate-700">Restoring Google Account Session from IndexedDB...</p>
+                <p className="text-[11px] text-slate-500">Checking local device persistence credentials.</p>
+              </div>
+            ) : user ? (
               /* User is Logged In */
               <div className="space-y-6">
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">

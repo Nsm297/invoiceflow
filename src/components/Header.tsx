@@ -12,6 +12,7 @@ interface HeaderProps {
   pinEnabled?: boolean;
   onLockApp?: () => void;
   user: User | null;
+  authLoading?: boolean;
   isSyncing?: boolean;
   onGoogleSignIn: () => void;
   onGoogleSignOut: () => void;
@@ -24,6 +25,7 @@ export const Header: React.FC<HeaderProps> = ({
   pinEnabled,
   onLockApp,
   user,
+  authLoading,
   isSyncing,
   onGoogleSignIn,
   onGoogleSignOut,
@@ -177,6 +179,11 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <i className="fa-solid fa-arrow-right-from-bracket"></i>
               </button>
+            </div>
+          ) : authLoading ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg min-h-[36px]">
+              <div className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+              <span className="hidden sm:inline font-medium">Restoring session...</span>
             </div>
           ) : (
             <button

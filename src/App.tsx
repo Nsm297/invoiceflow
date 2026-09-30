@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth';
 import { TabType, Customer, Invoice, BusinessInfo, SecurityConfig } from './types/invoice';
 import {
   getStoredCustomers,
@@ -22,9 +21,6 @@ import {
   DEFAULT_SECURITY_CONFIG,
 } from './utils/security';
 import {
-  auth,
-  loginWithGoogle,
-  logoutUser,
   syncDataToFirestore,
   fetchDataFromFirestore,
   checkRedirectLogin,
@@ -36,6 +32,8 @@ import {
   downloadInvoicePDF,
 } from './utils/pdfGenerator';
 import { downloadStandaloneHtmlApp } from './utils/standaloneApp';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { InAppBrowserWarning } from './components/InAppBrowserWarning';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { CustomerModule } from './components/CustomerModule';
@@ -49,15 +47,15 @@ import { SecurityLockScreen } from './components/SecurityLockScreen';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { OfflineIndicator } from './components/OfflineIndicator';
 
-export default function App() {
+function MainApp() {
+  const { user: currentUser, loading: authLoading, loginWithGoogle, logout: logoutUser } = useAuth();
   const [currentTab, setCurrentTab] = useState<TabType>('create');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo>(getStoredBusinessInfo());
   const [securityConfig, setSecurityConfig] = useState<SecurityConfig>(getStoredSecurityConfig());
 
-  // Firebase Auth & Cloud Sync States
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // Cloud Sync States
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
 
@@ -143,61 +141,73 @@ export default function App() {
     []
   );
 
-  // Monitor Firebase Auth state & initial Cloud fetch
+  // Check redirect login on initial mount
   useEffect(() => {
     checkRedirectLogin().catch(console.error);
+  }, []);
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
-      if (user) {
-        // Fetch cloud data for this user
-        try {
-          setIsSyncing(true);
-          const cloudData = await fetchDataFromFirestore(user.uid);
-          if (cloudData && (cloudData.invoices?.length || cloudData.customers?.length || cloudData.businessInfo)) {
-            // Apply cloud data to local state and localStorage
-            if (cloudData.customers && cloudData.customers.length > 0) {
-              setCustomers(cloudData.customers);
-              saveStoredCustomers(cloudData.customers);
-            }
-            if (cloudData.invoices && cloudData.invoices.length > 0) {
-              setInvoices(cloudData.invoices);
-              saveStoredInvoices(cloudData.invoices);
-            }
-            if (cloudData.businessInfo) {
-              setBusinessInfo(cloudData.businessInfo);
-              saveStoredBusinessInfo(cloudData.businessInfo);
-            }
-            setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-            showToast(
-              'success',
-              'Cloud Synced with Google Account',
-              `Loaded ${cloudData.invoices?.length || 0} invoices & ${cloudData.customers?.length || 0} customers from Firestore.`
-            );
-          } else {
-            // Initial account setup: seed Firestore with current local data
-            await autoSyncToCloud(user.uid, {
-              invoices: getStoredInvoices(),
-              customers: getStoredCustomers(),
-              businessInfo: getStoredBusinessInfo(),
-            });
-            showToast(
-              'success',
-              'Cloud Backup Initialized',
-              'Your current invoices and customers have been backed up to your Google account.'
-            );
+  // Monitor Firebase Auth state & fetch Cloud data once session is restored
+  useEffect(() => {
+    if (authLoading) return; // Wait until local IndexedDB session check completes
+    if (!currentUser) return;
+
+    let isMounted = true;
+
+    const loadCloudData = async () => {
+      try {
+        setIsSyncing(true);
+        const cloudData = await fetchDataFromFirestore(currentUser.uid);
+        if (!isMounted) return;
+
+        if (cloudData && (cloudData.invoices?.length || cloudData.customers?.length || cloudData.businessInfo)) {
+          // Apply cloud data to local state and localStorage
+          if (cloudData.customers && cloudData.customers.length > 0) {
+            setCustomers(cloudData.customers);
+            saveStoredCustomers(cloudData.customers);
           }
-        } catch (err) {
-          console.error('Error fetching cloud data on login:', err);
-          showToast('error', 'Cloud Fetch Failed', 'Could not retrieve data from Firestore.');
-        } finally {
+          if (cloudData.invoices && cloudData.invoices.length > 0) {
+            setInvoices(cloudData.invoices);
+            saveStoredInvoices(cloudData.invoices);
+          }
+          if (cloudData.businessInfo) {
+            setBusinessInfo(cloudData.businessInfo);
+            saveStoredBusinessInfo(cloudData.businessInfo);
+          }
+          setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+          showToast(
+            'success',
+            'Cloud Synced with Google Account',
+            `Loaded ${cloudData.invoices?.length || 0} invoices & ${cloudData.customers?.length || 0} customers from Firestore.`
+          );
+        } else {
+          // Initial account setup: seed Firestore with current local data
+          await autoSyncToCloud(currentUser.uid, {
+            invoices: getStoredInvoices(),
+            customers: getStoredCustomers(),
+            businessInfo: getStoredBusinessInfo(),
+          });
+          showToast(
+            'success',
+            'Cloud Backup Initialized',
+            'Your current invoices and customers have been backed up to your Google account.'
+          );
+        }
+      } catch (err) {
+        console.error('Error fetching cloud data on login:', err);
+        showToast('error', 'Cloud Fetch Failed', 'Could not retrieve data from Firestore.');
+      } finally {
+        if (isMounted) {
           setIsSyncing(false);
         }
       }
-    });
+    };
 
-    return () => unsubscribe();
-  }, [showToast, autoSyncToCloud]);
+    loadCloudData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser, authLoading, showToast, autoSyncToCloud]);
 
   // Google Login / Logout Handlers
   const handleGoogleSignIn = async () => {
@@ -225,7 +235,6 @@ export default function App() {
     try {
       await logoutUser();
       clearAllUserData();
-      setCurrentUser(null);
       setCustomers([]);
       setInvoices([]);
       setBusinessInfo(DEFAULT_BUSINESS_INFO);
@@ -530,6 +539,9 @@ export default function App() {
       {/* Toast Feedback notifications */}
       <ToastContainer toasts={toasts} onDismiss={handleDismissToast} />
 
+      {/* In-App Browser Warning Banner (WhatsApp / Instagram / Facebook Webview) */}
+      <InAppBrowserWarning />
+
       {/* Top Header Bar */}
       <Header
         currentTab={currentTab}
@@ -542,6 +554,7 @@ export default function App() {
         pinEnabled={securityConfig.pinEnabled}
         onLockApp={handleLockApp}
         user={currentUser}
+        authLoading={authLoading}
         isSyncing={isSyncing}
         onGoogleSignIn={handleGoogleSignIn}
         onGoogleSignOut={handleGoogleSignOut}
@@ -624,6 +637,7 @@ export default function App() {
             onNavigateToCreate={() => setCurrentTab('create')}
             onLockApp={handleLockApp}
             user={currentUser}
+            authLoading={authLoading}
             isSyncing={isSyncing}
             lastSyncedTime={lastSyncedTime}
             onGoogleSignIn={handleGoogleSignIn}
@@ -812,3 +826,12 @@ export default function App() {
     </div>
   );
 }
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
+  );
+}
+
