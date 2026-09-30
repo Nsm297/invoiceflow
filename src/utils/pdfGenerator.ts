@@ -5,7 +5,7 @@ import { formatRupees, formatDate, cleanPhoneForWhatsApp } from './formatters';
 
 /**
  * Builds an off-screen HTML element representation of the invoice
- * styled and formatted for crisp full-bleed single-page A4 rendering (794px × 1123px).
+ * styled and formatted for crisp single-image rendering (794px width).
  */
 function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo): HTMLDivElement {
   const container = document.createElement('div');
@@ -13,7 +13,6 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
   container.style.left = '-9999px';
   container.style.top = '-9999px';
   container.style.width = '794px'; // Standard A4 pixel width at 96 DPI
-  container.style.height = '1123px'; // Standard A4 pixel height at 96 DPI
   container.style.backgroundColor = '#ffffff';
   container.style.color = '#0f172a';
   container.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
@@ -26,7 +25,7 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
 
   const itemsCount = invoice.items?.length || 0;
 
-  // Responsive padding and typography based on item density to guarantee 1-page fit
+  // Responsive padding and typography based on item density
   let bodyPadding = '32px 36px';
   let headerMarginBottom = '16px';
   let tablePadding = '8px 10px';
@@ -91,7 +90,7 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
     .join('');
 
   container.innerHTML = `
-    <div style="display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; height: 100%; width: 100%;">
+    <div style="display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; width: 100%;">
       <div>
         <!-- Store & Invoice Header -->
         <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: ${headerMarginBottom}; border-bottom: 2px solid #0f172a; margin-bottom: ${headerMarginBottom};">
@@ -197,7 +196,7 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
       <!-- Footer -->
       <div style="border-top: 1px solid #e2e8f0; padding-top: 10px; margin-top: 8px; text-align: center; font-size: 10px; color: #64748b;">
         <div>Thank you for your business! For any billing queries, contact ${businessInfo.phone || 'us'}.</div>
-        <div style="margin-top: 2px; font-size: 9px; color: #94a3b8;">Generated via InvoiceFlow · Single Page A4 Standard</div>
+        <div style="margin-top: 2px; font-size: 9px; color: #94a3b8;">Generated via InvoiceFlow</div>
       </div>
     </div>
   `;
@@ -206,23 +205,16 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
 }
 
 /**
- * Generates an A4 Single-Page PDF with full bleed (0, 0, 210, 297mm):
- * 1. Temporarily removes box-shadow, border-radius, margin, and outer padding from the invoice element.
- * 2. Ensures canvas renders at full A4 ratio dimensions (794px × 1123px).
- * 3. In jsPDF, initializes as A4 (new jsPDF('p', 'mm', 'a4')) and renders image at (0, 0) with width 210mm and height 297mm:
- *    doc.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
- * 4. Restores original styles on the DOM element after capturing.
+ * Captures the invoice DOM element as a high-resolution HTML Canvas:
+ * 1. Temporarily removes box-shadow, border-radius, margin, and card-style outer borders.
+ * 2. Uses html2canvas with scale: 2 and backgroundColor: '#ffffff' for high-quality rendering.
+ * 3. Restores original element styles after capture.
  */
-export async function generateInvoicePDF(
+export async function captureInvoiceCanvas(
   invoice: Invoice,
   businessInfo: BusinessInfo,
   sourceElement?: HTMLElement | null
-): Promise<{ doc: jsPDF; pdfBlob: Blob; pdfFile: File; filename: string }> {
-  const invoiceNumber = invoice.invoiceNumber || 'INV';
-  const cleanInvNumber = invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const filename = `Invoice_${cleanInvNumber}.pdf`;
-
-  // Look for existing #printable-invoice in DOM if sourceElement not provided
+): Promise<HTMLCanvasElement> {
   let element = sourceElement || (document.getElementById('printable-invoice') as HTMLElement | null);
   let isCreated = false;
 
@@ -241,51 +233,33 @@ export async function generateInvoicePDF(
     padding: element.style.padding,
     width: element.style.width,
     maxWidth: element.style.maxWidth,
-    minHeight: element.style.minHeight,
-    height: element.style.height,
     background: element.style.background,
     backgroundColor: element.style.backgroundColor,
   };
 
   try {
-    // 1. Temporarily remove box-shadow, border-radius, margin, and outer padding
-    // so it spans full width/height without any card-style outer borders
+    // 1. Temporarily remove box-shadow, border-radius, margin, and extra card borders
     element.style.setProperty('box-shadow', 'none', 'important');
     element.style.setProperty('border-radius', '0', 'important');
     element.style.setProperty('border', 'none', 'important');
     element.style.setProperty('margin', '0', 'important');
-    element.style.setProperty('padding', '32px 36px', 'important');
+    element.style.setProperty('padding', '28px 32px', 'important');
     element.style.setProperty('width', '794px', 'important');
     element.style.setProperty('max-width', '794px', 'important');
-    element.style.setProperty('min-height', '1123px', 'important');
-    element.style.setProperty('height', '1123px', 'important');
     element.style.setProperty('background-color', '#ffffff', 'important');
 
-    // 2. Ensure canvas renders at full A4 ratio dimensions (794px × 1123px)
+    // 2. High-quality capture (scale: 2, backgroundColor: '#ffffff')
     const canvas = await html2canvas(element, {
-      scale: 2, // High resolution crisp DPI
+      scale: 2,
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff',
-      width: 794,
-      height: 1123,
       windowWidth: 794,
-      windowHeight: 1123,
     });
 
-    // 3. In jsPDF, initialize as A4 (new jsPDF('p', 'mm', 'a4'))
-    const doc = new jsPDF('p', 'mm', 'a4');
-
-    // Render image starting strictly at position (0, 0) with full width 210mm and height 297mm
-    const imgData = canvas.toDataURL('image/png', 1.0);
-    doc.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
-
-    const pdfBlob = doc.output('blob');
-    const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
-
-    return { doc, pdfBlob, pdfFile, filename };
+    return canvas;
   } finally {
-    // 4. Restore original styles on the DOM element after capturing
+    // 3. Restore original styles on the DOM element
     if (isCreated && element.parentNode) {
       element.parentNode.removeChild(element);
     } else if (element) {
@@ -296,8 +270,6 @@ export async function generateInvoicePDF(
       element.style.padding = originalStyles.padding;
       element.style.width = originalStyles.width;
       element.style.maxWidth = originalStyles.maxWidth;
-      element.style.minHeight = originalStyles.minHeight;
-      element.style.height = originalStyles.height;
       element.style.background = originalStyles.background;
       element.style.backgroundColor = originalStyles.backgroundColor;
     }
@@ -305,7 +277,159 @@ export async function generateInvoicePDF(
 }
 
 /**
- * Triggers instant direct download of single-page A4 invoice PDF
+ * Converts invoice canvas to a JPG Blob and File object (image/jpeg, quality: 0.95).
+ */
+export async function generateInvoiceImageBlob(
+  invoice: Invoice,
+  businessInfo: BusinessInfo,
+  sourceElement?: HTMLElement | null
+): Promise<{ blob: Blob; imageFile: File; filename: string }> {
+  const invoiceNumber = invoice.invoiceNumber || 'INV';
+  const cleanInvNumber = invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const filename = `Invoice_${cleanInvNumber}.jpg`;
+
+  const canvas = await captureInvoiceCanvas(invoice, businessInfo, sourceElement);
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error('Failed to generate image blob from canvas'));
+          return;
+        }
+        const imageFile = new File([blob], filename, { type: 'image/jpeg' });
+        resolve({ blob, imageFile, filename });
+      },
+      'image/jpeg',
+      0.95
+    );
+  });
+}
+
+/**
+ * Downloads invoice directly as a high-quality JPG image photo.
+ */
+export async function downloadInvoiceImage(
+  invoice: Invoice,
+  businessInfo: BusinessInfo,
+  sourceElement?: HTMLElement | null
+): Promise<string> {
+  const { blob, filename } = await generateInvoiceImageBlob(invoice, businessInfo, sourceElement);
+  const link = document.createElement('a');
+  link.download = filename;
+  const url = URL.createObjectURL(blob);
+  link.href = url;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  return filename;
+}
+
+/**
+ * Direct WhatsApp Image Share:
+ * Captures invoice element at high quality (scale: 2, backgroundColor: '#ffffff'),
+ * converts result to JPG File object (quality: 0.95), and uses Web Share API
+ * or triggers JPG download fallback while opening WhatsApp chat.
+ */
+export async function shareInvoiceViaWhatsAppImage(
+  invoice: Invoice,
+  businessInfo: BusinessInfo,
+  sourceElement?: HTMLElement | null
+): Promise<'shared' | 'opened_wa_and_downloaded' | 'cancelled'> {
+  const invoiceNumber = invoice.invoiceNumber || 'INV';
+  const phone = cleanPhoneForWhatsApp(invoice.customerPhone || '');
+  const canvas = await captureInvoiceCanvas(invoice, businessInfo, sourceElement);
+
+  return new Promise((resolve) => {
+    canvas.toBlob(
+      async (blob) => {
+        if (!blob) {
+          resolve('cancelled');
+          return;
+        }
+
+        const imageFile = new File([blob], `Invoice_${invoiceNumber}.jpg`, { type: 'image/jpeg' });
+
+        if (navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+          try {
+            await navigator.share({
+              title: 'Invoice',
+              text: `Invoice #${invoiceNumber}`,
+              files: [imageFile],
+            });
+            resolve('shared');
+          } catch (err: any) {
+            if (err.name === 'AbortError') {
+              resolve('cancelled');
+              return;
+            }
+            // Download image fallback if share dismissed or failed
+            const link = document.createElement('a');
+            link.download = `Invoice_${invoiceNumber}.jpg`;
+            const url = URL.createObjectURL(blob);
+            link.href = url;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+            window.open(
+              `https://wa.me/${phone}?text=${encodeURIComponent(`Invoice #${invoiceNumber}`)}`,
+              '_blank'
+            );
+            resolve('opened_wa_and_downloaded');
+          }
+        } else {
+          // Download image fallback
+          const link = document.createElement('a');
+          link.download = `Invoice_${invoiceNumber}.jpg`;
+          const url = URL.createObjectURL(blob);
+          link.href = url;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+          window.open(
+            `https://wa.me/${phone}?text=${encodeURIComponent(`Invoice #${invoiceNumber}`)}`,
+            '_blank'
+          );
+          resolve('opened_wa_and_downloaded');
+        }
+      },
+      'image/jpeg',
+      0.95
+    );
+  });
+}
+
+/**
+ * Generates an A4 Single-Page PDF with full bleed (0, 0, 210, 297mm)
+ */
+export async function generateInvoicePDF(
+  invoice: Invoice,
+  businessInfo: BusinessInfo,
+  sourceElement?: HTMLElement | null
+): Promise<{ doc: jsPDF; pdfBlob: Blob; pdfFile: File; filename: string }> {
+  const invoiceNumber = invoice.invoiceNumber || 'INV';
+  const cleanInvNumber = invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const filename = `Invoice_${cleanInvNumber}.pdf`;
+
+  const canvas = await captureInvoiceCanvas(invoice, businessInfo, sourceElement);
+
+  const doc = new jsPDF('p', 'mm', 'a4');
+  const imgData = canvas.toDataURL('image/png', 1.0);
+  doc.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+
+  const pdfBlob = doc.output('blob');
+  const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+  return { doc, pdfBlob, pdfFile, filename };
+}
+
+/**
+ * Downloads single-page A4 invoice PDF
  */
 export async function downloadInvoicePDF(
   invoice: Invoice,
@@ -318,65 +442,6 @@ export async function downloadInvoicePDF(
 }
 
 /**
- * Reliable WhatsApp PDF File Share:
- * 1. Converts jsPDF output to Blob and File object:
- *    const pdfBlob = doc.output('blob');
- *    const pdfFile = new File([pdfBlob], `Invoice_${invoiceNumber}.pdf`, { type: 'application/pdf' });
- * 2. Checks Web Share API for files:
- *    if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
- *      await navigator.share({
- *        title: 'Invoice PDF',
- *        text: 'Please find attached invoice PDF.',
- *        files: [pdfFile]
- *      });
- *    } else {
- *      // Fallback: Download PDF & open WhatsApp chat
- *      doc.save(`Invoice_${invoiceNumber}.pdf`);
- *      const encodedText = encodeURIComponent(`Invoice #${invoiceNumber} PDF attached.`);
- *      window.open(`https://wa.me/${phone}?text=${encodedText}`, '_blank');
- *    }
+ * Alias to support WhatsApp sharing with image or PDF
  */
-export async function shareInvoiceWithPDF(
-  invoice: Invoice,
-  businessInfo: BusinessInfo,
-  sourceElement?: HTMLElement | null
-): Promise<'shared_file' | 'opened_wa_and_downloaded' | 'cancelled'> {
-  const invoiceNumber = invoice.invoiceNumber || 'INV';
-  const phone = cleanPhoneForWhatsApp(invoice.customerPhone || '');
-
-  // Step 1: Generate full bleed single-page A4 PDF
-  const { doc, pdfFile, filename } = await generateInvoicePDF(invoice, businessInfo, sourceElement);
-
-  // Step 2: Check Web Share API for files
-  const canShareFiles =
-    typeof navigator !== 'undefined' &&
-    typeof navigator.share === 'function' &&
-    typeof (navigator as any).canShare === 'function' &&
-    (navigator as any).canShare({ files: [pdfFile] });
-
-  if (canShareFiles) {
-    try {
-      await navigator.share({
-        title: 'Invoice PDF',
-        text: 'Please find attached invoice PDF.',
-        files: [pdfFile],
-      });
-      return 'shared_file';
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
-        return 'cancelled';
-      }
-      // If user cancelled native dialog or share failed, execute fallback
-    }
-  }
-
-  // Fallback: Download PDF & open WhatsApp chat
-  doc.save(filename);
-  const encodedText = encodeURIComponent(`Invoice #${invoiceNumber} PDF attached.`);
-  const waUrl = phone
-    ? `https://wa.me/${phone}?text=${encodedText}`
-    : `https://wa.me/?text=${encodedText}`;
-
-  window.open(waUrl, '_blank');
-  return 'opened_wa_and_downloaded';
-}
+export const shareInvoiceWithPDF = shareInvoiceViaWhatsAppImage;

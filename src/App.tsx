@@ -30,7 +30,11 @@ import {
   checkRedirectLogin,
 } from './utils/firebase';
 import { formatRupees, shareInvoiceViaWhatsApp } from './utils/formatters';
-import { shareInvoiceWithPDF, downloadInvoicePDF } from './utils/pdfGenerator';
+import {
+  shareInvoiceViaWhatsAppImage,
+  downloadInvoiceImage,
+  downloadInvoicePDF,
+} from './utils/pdfGenerator';
 import { downloadStandaloneHtmlApp } from './utils/standaloneApp';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
@@ -353,15 +357,15 @@ export default function App() {
     showToast('info', 'PIN Lock Reset', 'PIN protection has been disabled.');
   };
 
-  // WhatsApp share action with single-page PDF generation & Web Share API
+  // WhatsApp share action with high-resolution JPG image capture & Web Share API
   const handleShareWhatsApp = async (invoice: Invoice) => {
     try {
-      showToast('info', 'Preparing PDF...', `Generating single-page PDF for #${invoice.invoiceNumber}...`);
-      const result = await shareInvoiceWithPDF(invoice, businessInfo);
-      if (result === 'shared_file') {
-        showToast('success', 'PDF Shared Directly', `Invoice #${invoice.invoiceNumber} PDF shared via WhatsApp/Share.`);
+      showToast('info', 'Preparing Image...', `Capturing invoice image for #${invoice.invoiceNumber}...`);
+      const result = await shareInvoiceViaWhatsAppImage(invoice, businessInfo);
+      if (result === 'shared') {
+        showToast('success', 'Image Shared Directly', `Invoice #${invoice.invoiceNumber} image shared via WhatsApp/Share.`);
       } else if (result === 'opened_wa_and_downloaded') {
-        showToast('success', 'PDF Downloaded & WhatsApp Opened', `PDF saved to downloads. Select it in WhatsApp to send.`);
+        showToast('success', 'Image Downloaded & WhatsApp Opened', `Invoice image saved to downloads. Select it in WhatsApp to send.`);
       }
     } catch (err) {
       console.error('Share error:', err);

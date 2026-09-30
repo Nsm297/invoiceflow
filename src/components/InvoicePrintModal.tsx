@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { Invoice, BusinessInfo } from '../types/invoice';
 import { formatRupees, formatDate } from '../utils/formatters';
-import { downloadInvoicePDF, shareInvoiceWithPDF } from '../utils/pdfGenerator';
+import {
+  downloadInvoicePDF,
+  downloadInvoiceImage,
+  shareInvoiceViaWhatsAppImage,
+} from '../utils/pdfGenerator';
 
 interface InvoicePrintModalProps {
   invoice: Invoice | null;
@@ -20,6 +24,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isGeneratingJPG, setIsGeneratingJPG] = useState(false);
   const [isSharingWA, setIsSharingWA] = useState(false);
 
   if (!isOpen || !invoice) return null;
@@ -30,6 +35,18 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadJPG = async () => {
+    try {
+      setIsGeneratingJPG(true);
+      const printElement = document.getElementById('printable-invoice');
+      await downloadInvoiceImage(invoice, businessInfo, printElement);
+    } catch (err) {
+      console.error('Failed to generate JPG image:', err);
+    } finally {
+      setIsGeneratingJPG(false);
+    }
   };
 
   const handleDownloadPDF = async () => {
@@ -54,9 +71,9 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
     try {
       setIsSharingWA(true);
       const printElement = document.getElementById('printable-invoice');
-      await shareInvoiceWithPDF(invoice, businessInfo, printElement);
+      await shareInvoiceViaWhatsAppImage(invoice, businessInfo, printElement);
     } catch (err) {
-      console.error('Failed to share PDF:', err);
+      console.error('Failed to share image on WhatsApp:', err);
     } finally {
       setIsSharingWA(false);
     }
@@ -233,21 +250,36 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
               onClick={handleShareWhatsApp}
               disabled={isSharingWA}
               className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] disabled:opacity-75 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors active:scale-[0.98]"
-              title="Share invoice PDF directly on WhatsApp"
+              title="Share invoice image directly on WhatsApp"
             >
               {isSharingWA ? (
                 <i className="fa-solid fa-spinner fa-spin text-sm"></i>
               ) : (
                 <i className="fa-brands fa-whatsapp text-sm"></i>
               )}
-              <span>{isSharingWA ? 'Preparing PDF...' : 'WhatsApp'}</span>
+              <span>{isSharingWA ? 'Preparing...' : 'WhatsApp'}</span>
+            </button>
+
+            {/* Direct JPG Image Download Button */}
+            <button
+              onClick={handleDownloadJPG}
+              disabled={isGeneratingJPG}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-75 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors active:scale-[0.98]"
+              title="Download invoice directly as a high-quality JPG image"
+            >
+              {isGeneratingJPG ? (
+                <i className="fa-solid fa-circle-notch fa-spin text-xs"></i>
+              ) : (
+                <i className="fa-solid fa-image text-xs"></i>
+              )}
+              <span>{isGeneratingJPG ? 'Generating...' : 'Download Image (JPG)'}</span>
             </button>
 
             {/* Direct PDF Download Button */}
             <button
               onClick={handleDownloadPDF}
               disabled={isGeneratingPDF}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-75 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors active:scale-[0.98]"
+              className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-75 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors active:scale-[0.98]"
               title="Download single-page A4 PDF file"
             >
               {isGeneratingPDF ? (
@@ -255,7 +287,7 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
               ) : (
                 <i className="fa-solid fa-file-pdf text-xs"></i>
               )}
-              <span>{isGeneratingPDF ? 'Generating...' : 'Download PDF'}</span>
+              <span>{isGeneratingPDF ? 'Generating...' : 'PDF'}</span>
             </button>
 
             {/* Print Button */}
