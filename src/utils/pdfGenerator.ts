@@ -1,11 +1,11 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Invoice, BusinessInfo } from '../types/invoice';
-import { formatRupees, formatDate, cleanPhoneForWhatsApp, generateWhatsAppInvoiceMessage } from './formatters';
+import { formatRupees, formatDate, cleanPhoneForWhatsApp } from './formatters';
 
 /**
  * Builds an off-screen HTML element representation of the invoice
- * styled and formatted for crisp single-page A4 rendering.
+ * styled and formatted for crisp full-bleed single-page A4 rendering (794px × 1123px).
  */
 function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo): HTMLDivElement {
   const container = document.createElement('div');
@@ -13,15 +13,20 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
   container.style.left = '-9999px';
   container.style.top = '-9999px';
   container.style.width = '794px'; // Standard A4 pixel width at 96 DPI
+  container.style.height = '1123px'; // Standard A4 pixel height at 96 DPI
   container.style.backgroundColor = '#ffffff';
   container.style.color = '#0f172a';
   container.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
   container.style.boxSizing = 'border-box';
   container.style.zIndex = '-1000';
+  container.style.boxShadow = 'none';
+  container.style.borderRadius = '0';
+  container.style.border = 'none';
+  container.style.margin = '0';
 
   const itemsCount = invoice.items?.length || 0;
 
-  // Responsive padding and typography based on item density
+  // Responsive padding and typography based on item density to guarantee 1-page fit
   let bodyPadding = '32px 36px';
   let headerMarginBottom = '16px';
   let tablePadding = '8px 10px';
@@ -31,7 +36,7 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
   let compactSummary = false;
 
   if (itemsCount > 18) {
-    bodyPadding = '16px 20px';
+    bodyPadding = '18px 22px';
     headerMarginBottom = '8px';
     tablePadding = '3px 6px';
     fontSizeBase = '9.5px';
@@ -39,7 +44,7 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
     fontInvNumber = '17px';
     compactSummary = true;
   } else if (itemsCount > 12) {
-    bodyPadding = '20px 24px';
+    bodyPadding = '22px 26px';
     headerMarginBottom = '10px';
     tablePadding = '4px 8px';
     fontSizeBase = '10.5px';
@@ -47,7 +52,7 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
     fontInvNumber = '19px';
     compactSummary = true;
   } else if (itemsCount > 7) {
-    bodyPadding = '24px 28px';
+    bodyPadding = '26px 30px';
     headerMarginBottom = '12px';
     tablePadding = '6px 8px';
     fontSizeBase = '11.5px';
@@ -86,7 +91,7 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
     .join('');
 
   container.innerHTML = `
-    <div style="display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; min-height: 100%;">
+    <div style="display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; height: 100%; width: 100%;">
       <div>
         <!-- Store & Invoice Header -->
         <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: ${headerMarginBottom}; border-bottom: 2px solid #0f172a; margin-bottom: ${headerMarginBottom};">
@@ -201,75 +206,100 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
 }
 
 /**
- * Generates strict Single-Page A4 PDF with exact auto-scaling ratio:
- * 1. A4 dimensions: pdfWidth = 210mm, pdfHeight = 297mm.
- * 2. scaledImgHeight = (canvas.height * pdfWidth) / canvas.width.
- * 3. If scaledImgHeight > pdfHeight: scaleFactor = pdfHeight / scaledImgHeight.
- * 4. Apply scaleFactor to BOTH width and height: finalWidth = pdfWidth * scaleFactor, finalHeight = scaledImgHeight * scaleFactor.
- *    Center horizontally on page: xOffset = (pdfWidth - finalWidth) / 2.
- * 5. Single page forced: doc.addPage() is NEVER called under any condition.
+ * Generates an A4 Single-Page PDF with full bleed (0, 0, 210, 297mm):
+ * 1. Temporarily removes box-shadow, border-radius, margin, and outer padding from the invoice element.
+ * 2. Ensures canvas renders at full A4 ratio dimensions (794px × 1123px).
+ * 3. In jsPDF, initializes as A4 (new jsPDF('p', 'mm', 'a4')) and renders image at (0, 0) with width 210mm and height 297mm:
+ *    doc.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+ * 4. Restores original styles on the DOM element after capturing.
  */
 export async function generateInvoicePDF(
   invoice: Invoice,
-  businessInfo: BusinessInfo
+  businessInfo: BusinessInfo,
+  sourceElement?: HTMLElement | null
 ): Promise<{ doc: jsPDF; pdfBlob: Blob; pdfFile: File; filename: string }> {
-  const element = createInvoicePrintElement(invoice, businessInfo);
-  document.body.appendChild(element);
+  const invoiceNumber = invoice.invoiceNumber || 'INV';
+  const cleanInvNumber = invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const filename = `Invoice_${cleanInvNumber}.pdf`;
+
+  // Look for existing #printable-invoice in DOM if sourceElement not provided
+  let element = sourceElement || (document.getElementById('printable-invoice') as HTMLElement | null);
+  let isCreated = false;
+
+  if (!element) {
+    element = createInvoicePrintElement(invoice, businessInfo);
+    document.body.appendChild(element);
+    isCreated = true;
+  }
+
+  // Backup original styles before modifying
+  const originalStyles = {
+    boxShadow: element.style.boxShadow,
+    borderRadius: element.style.borderRadius,
+    border: element.style.border,
+    margin: element.style.margin,
+    padding: element.style.padding,
+    width: element.style.width,
+    maxWidth: element.style.maxWidth,
+    minHeight: element.style.minHeight,
+    height: element.style.height,
+    background: element.style.background,
+    backgroundColor: element.style.backgroundColor,
+  };
 
   try {
+    // 1. Temporarily remove box-shadow, border-radius, margin, and outer padding
+    // so it spans full width/height without any card-style outer borders
+    element.style.setProperty('box-shadow', 'none', 'important');
+    element.style.setProperty('border-radius', '0', 'important');
+    element.style.setProperty('border', 'none', 'important');
+    element.style.setProperty('margin', '0', 'important');
+    element.style.setProperty('padding', '32px 36px', 'important');
+    element.style.setProperty('width', '794px', 'important');
+    element.style.setProperty('max-width', '794px', 'important');
+    element.style.setProperty('min-height', '1123px', 'important');
+    element.style.setProperty('height', '1123px', 'important');
+    element.style.setProperty('background-color', '#ffffff', 'important');
+
+    // 2. Ensure canvas renders at full A4 ratio dimensions (794px × 1123px)
     const canvas = await html2canvas(element, {
       scale: 2, // High resolution crisp DPI
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff',
+      width: 794,
+      height: 1123,
       windowWidth: 794,
+      windowHeight: 1123,
     });
 
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4',
-      compress: true,
-      putOnlyUsedFonts: true,
-    });
+    // 3. In jsPDF, initialize as A4 (new jsPDF('p', 'mm', 'a4'))
+    const doc = new jsPDF('p', 'mm', 'a4');
 
-    const pdfWidth = 210; // A4 width in mm
-    const pdfHeight = 297; // A4 height in mm
-
-    // Calculate initial scaled image height based on full page width
-    const scaledImgHeight = (canvas.height * pdfWidth) / canvas.width;
-
-    let finalWidth = pdfWidth;
-    let finalHeight = scaledImgHeight;
-    let xOffset = 0;
-    let yOffset = 0;
-
-    // Strict single-page scaling ratio
-    if (scaledImgHeight > pdfHeight) {
-      const scaleFactor = pdfHeight / scaledImgHeight;
-      finalWidth = pdfWidth * scaleFactor;
-      finalHeight = scaledImgHeight * scaleFactor; // equals pdfHeight
-      xOffset = (pdfWidth - finalWidth) / 2; // Center horizontally
-      yOffset = 0;
-    } else {
-      xOffset = 0;
-      yOffset = (pdfHeight - scaledImgHeight) > 10 ? 4 : 0;
-    }
-
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    doc.addImage(imgData, 'JPEG', xOffset, yOffset, finalWidth, finalHeight, undefined, 'FAST');
-
-    const cleanCustName = (invoice.customerName || 'Customer').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const cleanInvNumber = (invoice.invoiceNumber || 'INV').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const filename = `Invoice_${cleanInvNumber}_${cleanCustName}.pdf`;
+    // Render image starting strictly at position (0, 0) with full width 210mm and height 297mm
+    const imgData = canvas.toDataURL('image/png', 1.0);
+    doc.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
 
     const pdfBlob = doc.output('blob');
     const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
 
     return { doc, pdfBlob, pdfFile, filename };
   } finally {
-    if (element.parentNode) {
+    // 4. Restore original styles on the DOM element after capturing
+    if (isCreated && element.parentNode) {
       element.parentNode.removeChild(element);
+    } else if (element) {
+      element.style.boxShadow = originalStyles.boxShadow;
+      element.style.borderRadius = originalStyles.borderRadius;
+      element.style.border = originalStyles.border;
+      element.style.margin = originalStyles.margin;
+      element.style.padding = originalStyles.padding;
+      element.style.width = originalStyles.width;
+      element.style.maxWidth = originalStyles.maxWidth;
+      element.style.minHeight = originalStyles.minHeight;
+      element.style.height = originalStyles.height;
+      element.style.background = originalStyles.background;
+      element.style.backgroundColor = originalStyles.backgroundColor;
     }
   }
 }
@@ -279,31 +309,45 @@ export async function generateInvoicePDF(
  */
 export async function downloadInvoicePDF(
   invoice: Invoice,
-  businessInfo: BusinessInfo
+  businessInfo: BusinessInfo,
+  sourceElement?: HTMLElement | null
 ): Promise<string> {
-  const { doc, filename } = await generateInvoicePDF(invoice, businessInfo);
+  const { doc, filename } = await generateInvoicePDF(invoice, businessInfo, sourceElement);
   doc.save(filename);
   return filename;
 }
 
 /**
- * Send Actual PDF File via WhatsApp (Web Share API):
- * 1. Generates single-page PDF and creates File object:
- *    const pdfFile = new File([pdfBlob], 'Invoice.pdf', { type: 'application/pdf' });
- * 2. If navigator.canShare && navigator.canShare({ files: [pdfFile] }):
- *    Invokes await navigator.share({ files: [pdfFile], title: 'Invoice PDF', text: 'Here is your invoice PDF' }).
- *    This opens native Android/iOS share sheet directly showing WhatsApp with the PDF attached!
- * 3. If false (Desktop Web), triggers PDF download doc.save('Invoice.pdf') and opens https://wa.me/...
- *    with the invoice summary message.
+ * Reliable WhatsApp PDF File Share:
+ * 1. Converts jsPDF output to Blob and File object:
+ *    const pdfBlob = doc.output('blob');
+ *    const pdfFile = new File([pdfBlob], `Invoice_${invoiceNumber}.pdf`, { type: 'application/pdf' });
+ * 2. Checks Web Share API for files:
+ *    if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+ *      await navigator.share({
+ *        title: 'Invoice PDF',
+ *        text: 'Please find attached invoice PDF.',
+ *        files: [pdfFile]
+ *      });
+ *    } else {
+ *      // Fallback: Download PDF & open WhatsApp chat
+ *      doc.save(`Invoice_${invoiceNumber}.pdf`);
+ *      const encodedText = encodeURIComponent(`Invoice #${invoiceNumber} PDF attached.`);
+ *      window.open(`https://wa.me/${phone}?text=${encodedText}`, '_blank');
+ *    }
  */
 export async function shareInvoiceWithPDF(
   invoice: Invoice,
-  businessInfo: BusinessInfo
+  businessInfo: BusinessInfo,
+  sourceElement?: HTMLElement | null
 ): Promise<'shared_file' | 'opened_wa_and_downloaded' | 'cancelled'> {
-  // Step 1: Generate strict single-page PDF
-  const { doc, pdfFile, filename } = await generateInvoicePDF(invoice, businessInfo);
+  const invoiceNumber = invoice.invoiceNumber || 'INV';
+  const phone = cleanPhoneForWhatsApp(invoice.customerPhone || '');
 
-  // Step 2: Check Web Share API for native file sharing (Mobile devices)
+  // Step 1: Generate full bleed single-page A4 PDF
+  const { doc, pdfFile, filename } = await generateInvoicePDF(invoice, businessInfo, sourceElement);
+
+  // Step 2: Check Web Share API for files
   const canShareFiles =
     typeof navigator !== 'undefined' &&
     typeof navigator.share === 'function' &&
@@ -313,30 +357,26 @@ export async function shareInvoiceWithPDF(
   if (canShareFiles) {
     try {
       await navigator.share({
-        files: [pdfFile],
         title: 'Invoice PDF',
-        text: `Here is your invoice PDF (#${invoice.invoiceNumber || ''}) from ${businessInfo.name || 'InvoiceFlow'}.`,
+        text: 'Please find attached invoice PDF.',
+        files: [pdfFile],
       });
       return 'shared_file';
     } catch (err: any) {
       if (err.name === 'AbortError') {
         return 'cancelled';
       }
-      // If user cancelled or error occurred, proceed to fallback
+      // If user cancelled native dialog or share failed, execute fallback
     }
   }
 
-  // Fallback for Desktop Web or non-file share browsers:
-  // Trigger PDF download doc.save(filename) and open https://wa.me/...
+  // Fallback: Download PDF & open WhatsApp chat
   doc.save(filename);
-
-  const cleanPhone = cleanPhoneForWhatsApp(invoice.customerPhone || '');
-  const message = generateWhatsAppInvoiceMessage(invoice, businessInfo);
-  const waUrl = cleanPhone
-    ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`
-    : `https://wa.me/?text=${encodeURIComponent(message)}`;
+  const encodedText = encodeURIComponent(`Invoice #${invoiceNumber} PDF attached.`);
+  const waUrl = phone
+    ? `https://wa.me/${phone}?text=${encodedText}`
+    : `https://wa.me/?text=${encodedText}`;
 
   window.open(waUrl, '_blank');
-
   return 'opened_wa_and_downloaded';
 }

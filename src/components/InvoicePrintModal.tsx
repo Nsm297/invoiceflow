@@ -35,7 +35,8 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
   const handleDownloadPDF = async () => {
     try {
       setIsGeneratingPDF(true);
-      await downloadInvoicePDF(invoice, businessInfo);
+      const printElement = document.getElementById('printable-invoice');
+      await downloadInvoicePDF(invoice, businessInfo, printElement);
     } catch (err) {
       console.error('Failed to generate PDF:', err);
       // Fallback to browser print
@@ -52,7 +53,8 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
     }
     try {
       setIsSharingWA(true);
-      await shareInvoiceWithPDF(invoice, businessInfo);
+      const printElement = document.getElementById('printable-invoice');
+      await shareInvoiceWithPDF(invoice, businessInfo, printElement);
     } catch (err) {
       console.error('Failed to share PDF:', err);
     } finally {
