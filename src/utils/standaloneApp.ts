@@ -907,10 +907,10 @@ export const downloadStandaloneHtmlApp = () => {
     }
 
     var DEFAULT_STORE_INFO = {
-      name: 'Al-Madina Trading & Wholesale',
-      phone: '+92 300 8889900',
-      address: 'Shop #14, Main Commercial Market, City Center',
-      tagline: 'Dealers in Quality Rice, Oil, Grains & Wholesale Grocery'
+      name: 'InvoiceFlow Store',
+      phone: '',
+      address: '',
+      tagline: ''
     };
 
     var businessInfo = JSON.parse(localStorage.getItem(STORAGE_KEY_BUSINESS) || JSON.stringify(DEFAULT_STORE_INFO));

@@ -13,10 +13,13 @@ import {
   getStoredBusinessInfo,
   saveStoredBusinessInfo,
   resetAllDemoData,
+  clearAllUserData,
+  DEFAULT_BUSINESS_INFO,
 } from './utils/storage';
 import {
   getStoredSecurityConfig,
   saveStoredSecurityConfig,
+  DEFAULT_SECURITY_CONFIG,
 } from './utils/security';
 import {
   auth,
@@ -216,8 +219,19 @@ export default function App() {
   const handleGoogleSignOut = async () => {
     try {
       await logoutUser();
+      clearAllUserData();
       setCurrentUser(null);
-      showToast('info', 'Signed Out', 'You are now working in offline/local browser mode.');
+      setCustomers([]);
+      setInvoices([]);
+      setBusinessInfo(DEFAULT_BUSINESS_INFO);
+      setSecurityConfig(DEFAULT_SECURITY_CONFIG);
+      setIsLocked(false);
+      setEditingInvoice(null);
+      setPreselectedCustomer(null);
+      setPreviewInvoice(null);
+      setLastSyncedTime(null);
+      setCurrentTab('create');
+      showToast('info', 'Signed Out & Cleared', 'All previous user data cleared from this browser session.');
     } catch (err: any) {
       console.error('Sign out error:', err);
       showToast('error', 'Sign Out Error', err?.message);

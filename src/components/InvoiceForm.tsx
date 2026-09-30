@@ -16,14 +16,6 @@ interface InvoiceFormProps {
   onEditStoreInfo?: () => void;
 }
 
-const COMMON_PRESETS = [
-  { name: 'Super Basmati Rice (50kg Bag)', unitPrice: 12500 },
-  { name: 'Refined Cooking Oil (16L Tin)', unitPrice: 7800 },
-  { name: 'Fine Wheat Flour (20kg Bag)', unitPrice: 2200 },
-  { name: 'Premium Tea Blend (5kg Box)', unitPrice: 5400 },
-  { name: 'White Sugar (50kg Bag)', unitPrice: 6800 },
-];
-
 export const InvoiceForm: React.FC<InvoiceFormProps> = ({
   customers,
   existingInvoices,
@@ -612,7 +604,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                       required
                       value={item.name}
                       onChange={(e) => handleItemChange(index, 'name', e.target.value)}
-                      placeholder="e.g. Super Basmati Rice (50kg Bag)"
+                      placeholder="e.g. Item Description / Name"
                       className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 min-h-[38px]"
                     />
                   </div>
@@ -858,28 +850,6 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
             <p className="text-[11px] text-slate-400 text-center italic pt-1">
               * Form automatically clears empty after saving or generating PDF.
             </p>
-          </div>
-
-          {/* Quick Item Presets */}
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-2">
-              Quick Item Presets (Click to add)
-            </span>
-            <div className="space-y-1">
-              {COMMON_PRESETS.map((preset, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => handleAddItem(preset.name, preset.unitPrice)}
-                  className="w-full text-left text-xs text-slate-700 hover:text-slate-900 hover:bg-white p-2 rounded-lg border border-transparent hover:border-slate-200 transition-colors flex items-center justify-between"
-                >
-                  <span className="truncate pr-2">{preset.name}</span>
-                  <span className="font-mono text-[11px] text-slate-500 font-semibold shrink-0">
-                    {formatRupees(preset.unitPrice)}
-                  </span>
-                </button>
-              ))}
-            </div>
           </div>
 
         </div>

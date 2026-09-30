@@ -83,10 +83,20 @@ export const checkRedirectLogin = async (): Promise<User | null> => {
 };
 
 /**
- * Sign out current user
+ * Sign out current user and clear all cached user data
  */
 export const logoutUser = async (): Promise<void> => {
   await signOut(auth);
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('invoicegen_customers_v2');
+    localStorage.removeItem('invoicegen_invoices_v2');
+    localStorage.removeItem('invoicegen_business_v2');
+    localStorage.removeItem('invoicegen_security_v1');
+    localStorage.removeItem('invoicegen_device_has_passkey');
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.clear();
+    }
+  }
 };
 
 /**
