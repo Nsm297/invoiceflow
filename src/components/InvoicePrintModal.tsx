@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Invoice, BusinessInfo } from '../types/invoice';
-import { formatRupees, formatDate, shareInvoiceViaWhatsApp } from '../utils/formatters';
+import { formatRupees, formatDate } from '../utils/formatters';
+import { downloadInvoicePDF, shareInvoiceWithPDF } from '../utils/pdfGenerator';
 
 interface InvoicePrintModalProps {
   invoice: Invoice | null;
@@ -18,6 +19,8 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
   onShareWhatsApp,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isSharingWA, setIsSharingWA] = useState(false);
 
   if (!isOpen || !invoice) return null;
 
@@ -29,11 +32,31 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
     window.print();
   };
 
+  const handleDownloadPDF = async () => {
+    try {
+      setIsGeneratingPDF(true);
+      await downloadInvoicePDF(invoice, businessInfo);
+    } catch (err) {
+      console.error('Failed to generate PDF:', err);
+      // Fallback to browser print
+      window.print();
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
   const handleShareWhatsApp = async () => {
     if (onShareWhatsApp) {
       onShareWhatsApp(invoice);
-    } else {
-      await shareInvoiceViaWhatsApp(invoice, businessInfo);
+      return;
+    }
+    try {
+      setIsSharingWA(true);
+      await shareInvoiceWithPDF(invoice, businessInfo);
+    } catch (err) {
+      console.error('Failed to share PDF:', err);
+    } finally {
+      setIsSharingWA(false);
     }
   };
 
@@ -206,21 +229,41 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
             {/* WhatsApp Share Button */}
             <button
               onClick={handleShareWhatsApp}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-lg text-xs font-semibold shadow-sm transition-colors active:scale-[0.98]"
-              title="Share invoice directly on WhatsApp"
+              disabled={isSharingWA}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] disabled:opacity-75 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors active:scale-[0.98]"
+              title="Share invoice PDF directly on WhatsApp"
             >
-              <i className="fa-brands fa-whatsapp text-sm"></i>
-              <span>WhatsApp</span>
+              {isSharingWA ? (
+                <i className="fa-solid fa-spinner fa-spin text-sm"></i>
+              ) : (
+                <i className="fa-brands fa-whatsapp text-sm"></i>
+              )}
+              <span>{isSharingWA ? 'Preparing PDF...' : 'WhatsApp'}</span>
             </button>
 
-            {/* Print / Save as PDF Button */}
+            {/* Direct PDF Download Button */}
+            <button
+              onClick={handleDownloadPDF}
+              disabled={isGeneratingPDF}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-75 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors active:scale-[0.98]"
+              title="Download single-page A4 PDF file"
+            >
+              {isGeneratingPDF ? (
+                <i className="fa-solid fa-circle-notch fa-spin text-xs"></i>
+              ) : (
+                <i className="fa-solid fa-file-pdf text-xs"></i>
+              )}
+              <span>{isGeneratingPDF ? 'Generating...' : 'Download PDF'}</span>
+            </button>
+
+            {/* Print Button */}
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
-              title="Print document or save as PDF"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium border border-slate-700 transition-colors"
+              title="Print document via system print dialog"
             >
               <i className="fa-solid fa-print text-xs"></i>
-              <span>Print / PDF</span>
+              <span>Print</span>
             </button>
 
             {/* Download Standalone HTML Button */}

@@ -30,6 +30,7 @@ import {
   checkRedirectLogin,
 } from './utils/firebase';
 import { formatRupees, shareInvoiceViaWhatsApp } from './utils/formatters';
+import { shareInvoiceWithPDF, downloadInvoicePDF } from './utils/pdfGenerator';
 import { downloadStandaloneHtmlApp } from './utils/standaloneApp';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
@@ -352,17 +353,20 @@ export default function App() {
     showToast('info', 'PIN Lock Reset', 'PIN protection has been disabled.');
   };
 
-  // WhatsApp share action
+  // WhatsApp share action with single-page PDF generation & Web Share API
   const handleShareWhatsApp = async (invoice: Invoice) => {
     try {
-      const result = await shareInvoiceViaWhatsApp(invoice, businessInfo);
-      if (result === 'shared') {
-        showToast('success', 'Shared via Mobile Sheet', `Invoice #${invoice.invoiceNumber} shared.`);
-      } else if (result === 'opened') {
-        showToast('info', 'Opening WhatsApp', `Connecting to WhatsApp for ${invoice.customerName}...`);
+      showToast('info', 'Preparing PDF...', `Generating single-page PDF for #${invoice.invoiceNumber}...`);
+      const result = await shareInvoiceWithPDF(invoice, businessInfo);
+      if (result === 'shared_file') {
+        showToast('success', 'PDF Shared Directly', `Invoice #${invoice.invoiceNumber} PDF shared via WhatsApp/Share.`);
+      } else if (result === 'opened_wa_and_downloaded') {
+        showToast('success', 'PDF Downloaded & WhatsApp Opened', `PDF saved to downloads. Select it in WhatsApp to send.`);
       }
-    } catch {
-      showToast('error', 'Share Error', 'Could not open WhatsApp.');
+    } catch (err) {
+      console.error('Share error:', err);
+      showToast('info', 'Opening WhatsApp', `Connecting to WhatsApp for ${invoice.customerName}...`);
+      await shareInvoiceViaWhatsApp(invoice, businessInfo);
     }
   };
 
