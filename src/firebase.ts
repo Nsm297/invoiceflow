@@ -5,6 +5,7 @@ import {
   setPersistence,
   indexedDBLocalPersistence,
   browserLocalPersistence,
+  browserPopupRedirectResolver,
   GoogleAuthProvider,
   signInWithPopup,
   signInWithRedirect,
@@ -39,11 +40,12 @@ export const firebaseConfig = {
 // Initialize Firebase App
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Configure Firebase Auth to strictly maintain local session persistence
+// Configure Firebase Auth to strictly maintain local session persistence with browser popup/redirect resolver
 export const auth = (() => {
   try {
     return initializeAuth(app, {
       persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+      popupRedirectResolver: browserPopupRedirectResolver,
     });
   } catch {
     return getAuth(app);
@@ -92,13 +94,13 @@ export const loginWithGoogle = async (): Promise<User | null> => {
   }
 
   try {
-    const result = await signInWithPopup(auth, googleProvider);
+    const result = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
     return result.user;
   } catch (error: any) {
     console.warn('Popup sign in error, attempting redirect fallback:', error);
     if (error?.code === 'auth/popup-blocked' || error?.code === 'auth/popup-closed-by-user') {
       try {
-        await signInWithRedirect(auth, googleProvider);
+        await signInWithRedirect(auth, googleProvider, browserPopupRedirectResolver);
       } catch (redirectError) {
         console.error('Redirect sign in failed:', redirectError);
         throw redirectError;
@@ -113,10 +115,26 @@ export const loginWithGoogle = async (): Promise<User | null> => {
  */
 export const checkRedirectLogin = async (): Promise<User | null> => {
   try {
-    const result = await getRedirectResult(auth);
+    if (typeof window === 'undefined') return null;
+
+    // Inside iframe or embedded preview environments, top redirect flows are restricted
+    const isIframe = window.self !== window.top;
+    if (isIframe) {
+      return null;
+    }
+
+    const result = await getRedirectResult(auth, browserPopupRedirectResolver);
     return result?.user || null;
-  } catch (error) {
-    console.error('Error getting redirect result:', error);
+  } catch (error: any) {
+    // Silently ignore standard missing redirect or argument error in constrained web environments
+    if (
+      error?.code === 'auth/argument-error' ||
+      error?.code === 'auth/no-auth-event' ||
+      error?.name === 'FirebaseError'
+    ) {
+      return null;
+    }
+    console.warn('Redirect login check note:', error?.message || error);
     return null;
   }
 };

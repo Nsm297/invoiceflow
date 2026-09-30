@@ -157,7 +157,7 @@ function MainApp() {
 
   // Check redirect login on initial mount
   useEffect(() => {
-    checkRedirectLogin().catch(console.error);
+    checkRedirectLogin().catch(() => {});
   }, []);
 
   // Monitor Firebase Auth state & fetch Cloud data once session is restored
