@@ -62,26 +62,50 @@ export const SecurityLockScreen: React.FC<SecurityLockScreenProps> = ({
     setErrorMessage('');
   }, []);
 
-  const handleBiometricUnlock = useCallback(async () => {
-    setIsBiometricPrompting(true);
-    setErrorMessage('');
-    try {
-      const result = await authenticateBiometrics(businessInfo.name || 'InvoiceFlow');
-      if (result.success) {
-        setErrorMessage('');
-        setPinDigits([]);
-        onUnlock();
-      } else if (result.error && !result.error.toLowerCase().includes('cancel')) {
-        setErrorMessage(result.error);
+  const handleBiometricUnlock = useCallback(
+    async (isAuto = false) => {
+      // Check if WebAuthn is supported
+      if (typeof window === 'undefined' || !window.PublicKeyCredential) {
+        if (!isAuto) {
+          setErrorMessage('Biometrics not supported on this browser.');
+        }
+        return;
       }
-    } catch {
-      setErrorMessage(
-        'No fingerprint registered for this device yet. Please unlock using your 4-digit PIN first, then register your fingerprint in Settings.'
-      );
-    } finally {
-      setIsBiometricPrompting(false);
+
+      setIsBiometricPrompting(true);
+      if (!isAuto) setErrorMessage('');
+      try {
+        const result = await authenticateBiometrics(businessInfo.name || 'InvoiceFlow');
+        if (result.success) {
+          setErrorMessage('');
+          setPinDigits([]);
+          onUnlock();
+        } else if (!isAuto && result.error && !result.error.toLowerCase().includes('cancel')) {
+          setErrorMessage(result.error);
+        }
+      } catch {
+        if (!isAuto) {
+          setErrorMessage(
+            'No fingerprint registered for this device yet. Please unlock using your 4-digit PIN first, then register your fingerprint in Settings.'
+          );
+        }
+      } finally {
+        setIsBiometricPrompting(false);
+      }
+    },
+    [businessInfo.name, onUnlock]
+  );
+
+  // Auto-trigger biometric fingerprint scan on LockScreen mount
+  useEffect(() => {
+    if (securityConfig.biometricEnabled) {
+      // Delay slightly for smooth mount and auto-invoke silently without error banner
+      const timer = setTimeout(() => {
+        handleBiometricUnlock(true);
+      }, 150);
+      return () => clearTimeout(timer);
     }
-  }, [businessInfo.name, onUnlock]);
+  }, [securityConfig.biometricEnabled, handleBiometricUnlock]);
 
   // Physical keyboard support
   useEffect(() => {
@@ -181,7 +205,7 @@ export const SecurityLockScreen: React.FC<SecurityLockScreenProps> = ({
           {securityConfig.biometricEnabled ? (
             <button
               type="button"
-              onClick={handleBiometricUnlock}
+              onClick={() => handleBiometricUnlock(false)}
               className="h-14 rounded-2xl bg-emerald-950/70 hover:bg-emerald-900 active:bg-emerald-800 text-emerald-400 font-medium border border-emerald-700/50 transition-all duration-150 active:scale-95 flex flex-col items-center justify-center gap-0.5"
               title="Unlock with Fingerprint / Face ID"
             >
@@ -222,7 +246,7 @@ export const SecurityLockScreen: React.FC<SecurityLockScreenProps> = ({
           <div className="pt-2 w-full max-w-[280px]">
             <button
               type="button"
-              onClick={handleBiometricUnlock}
+              onClick={() => handleBiometricUnlock(false)}
               className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-900/30 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
             >
               <i className="fa-solid fa-fingerprint text-base"></i>

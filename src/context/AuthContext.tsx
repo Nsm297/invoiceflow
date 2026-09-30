@@ -1,11 +1,19 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
-import { auth, loginWithGoogle as firebaseLoginWithGoogle, logoutUser as firebaseLogoutUser } from '../firebase';
+import {
+  auth,
+  loginWithGoogle as firebaseLoginWithGoogle,
+  logoutUser as firebaseLogoutUser,
+  loginWithEmail as firebaseLoginWithEmail,
+  registerWithEmail as firebaseRegisterWithEmail,
+} from '../firebase';
 
 export interface AuthContextType {
   user: User | null;
   loading: boolean;
   loginWithGoogle: () => Promise<User | null>;
+  loginWithEmail: (email: string, pass: string) => Promise<User | null>;
+  registerWithEmail: (email: string, pass: string) => Promise<User | null>;
   logout: () => Promise<void>;
   isInAppBrowser: boolean;
 }
@@ -14,6 +22,8 @@ export const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   loginWithGoogle: async () => null,
+  loginWithEmail: async () => null,
+  registerWithEmail: async () => null,
   logout: async () => {},
   isInAppBrowser: false,
 });
@@ -50,6 +60,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return await firebaseLoginWithGoogle();
   };
 
+  const loginWithEmail = async (email: string, pass: string): Promise<User | null> => {
+    return await firebaseLoginWithEmail(email, pass);
+  };
+
+  const registerWithEmail = async (email: string, pass: string): Promise<User | null> => {
+    return await firebaseRegisterWithEmail(email, pass);
+  };
+
   const logout = async (): Promise<void> => {
     await firebaseLogoutUser();
     setUser(null);
@@ -61,6 +79,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         loading,
         loginWithGoogle,
+        loginWithEmail,
+        registerWithEmail,
         logout,
         isInAppBrowser,
       }}

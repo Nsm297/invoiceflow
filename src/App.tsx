@@ -34,6 +34,7 @@ import {
 import { downloadStandaloneHtmlApp } from './utils/standaloneApp';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { InAppBrowserWarning } from './components/InAppBrowserWarning';
+import { Login } from './pages/Login';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { CustomerModule } from './components/CustomerModule';
@@ -55,13 +56,24 @@ function MainApp() {
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo>(getStoredBusinessInfo());
   const [securityConfig, setSecurityConfig] = useState<SecurityConfig>(getStoredSecurityConfig());
 
+  // Guest / Offline Mode Flag
+  const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
+    if (typeof sessionStorage !== 'undefined') {
+      return sessionStorage.getItem('pwa_guest_mode') === 'true';
+    }
+    return false;
+  });
+
   // Cloud Sync States
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
 
-  // Security Lock state
+  // Security Lock state - maintain unlocked state across page refreshes via sessionStorage
   const [isLocked, setIsLocked] = useState<boolean>(() => {
     const sec = getStoredSecurityConfig();
+    const isUnlockedInSession =
+      typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pwa_unlocked') === 'true';
+    if (isUnlockedInSession) return false;
     return Boolean(sec.pinEnabled && sec.pin);
   });
 
@@ -96,7 +108,9 @@ function MainApp() {
     setBusinessInfo(getStoredBusinessInfo());
     const sec = getStoredSecurityConfig();
     setSecurityConfig(sec);
-    if (sec.pinEnabled && sec.pin) {
+    const isUnlockedInSession =
+      typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pwa_unlocked') === 'true';
+    if (sec.pinEnabled && sec.pin && !isUnlockedInSession) {
       setIsLocked(true);
     }
   }, []);
@@ -215,6 +229,10 @@ function MainApp() {
       showToast('info', 'Connecting to Google...', 'Opening Google Authentication popup.');
       const user = await loginWithGoogle();
       if (user) {
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.removeItem('pwa_guest_mode');
+        }
+        setIsGuestMode(false);
         showToast('success', 'Signed In', `Welcome ${user.displayName || user.email}!`);
       }
     } catch (err: any) {
@@ -231,10 +249,22 @@ function MainApp() {
     }
   };
 
+  const handleOpenLoginScreen = () => {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem('pwa_guest_mode');
+    }
+    setIsGuestMode(false);
+  };
+
   const handleGoogleSignOut = async () => {
     try {
       await logoutUser();
       clearAllUserData();
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem('pwa_unlocked');
+        sessionStorage.removeItem('pwa_guest_mode');
+      }
+      setIsGuestMode(false);
       setCustomers([]);
       setInvoices([]);
       setBusinessInfo(DEFAULT_BUSINESS_INFO);
@@ -245,7 +275,7 @@ function MainApp() {
       setPreviewInvoice(null);
       setLastSyncedTime(null);
       setCurrentTab('create');
-      showToast('info', 'Signed Out & Cleared', 'All previous user data cleared from this browser session.');
+      showToast('info', 'Signed Out', 'You have been signed out. Please log in to continue.');
     } catch (err: any) {
       console.error('Sign out error:', err);
       showToast('error', 'Sign Out Error', err?.message);
@@ -340,6 +370,9 @@ function MainApp() {
 
   const handleLockApp = () => {
     if (securityConfig.pinEnabled) {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem('pwa_unlocked');
+      }
       setIsLocked(true);
       showToast('info', 'App Locked', 'Passcode PIN required to unlock.');
     } else {
@@ -349,6 +382,9 @@ function MainApp() {
   };
 
   const handleUnlockApp = () => {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('pwa_unlocked', 'true');
+    }
     setIsLocked(false);
     showToast('success', 'Unlocked Successfully', `Welcome back to ${businessInfo.name || 'InvoiceFlow'}!`);
   };
@@ -362,6 +398,9 @@ function MainApp() {
     };
     saveStoredSecurityConfig(updated);
     setSecurityConfig(updated);
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem('pwa_unlocked');
+    }
     setIsLocked(false);
     showToast('info', 'PIN Lock Reset', 'PIN protection has been disabled.');
   };
@@ -524,6 +563,42 @@ function MainApp() {
     showToast('success', 'Demo Data Restored', 'Loaded sample customers and invoices in Rupees (Rs.).');
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <h2 className="text-base font-bold text-slate-800">InvoiceFlow</h2>
+        <p className="text-xs text-slate-500 mt-1">Restoring your secure session...</p>
+      </div>
+    );
+  }
+
+  // 0. Standard Email & Password Login Screen for unauthenticated users and after logout
+  if (!currentUser && !isGuestMode) {
+    return (
+      <>
+        <ToastContainer toasts={toasts} onDismiss={handleDismissToast} />
+        <InAppBrowserWarning />
+        <Login
+          onSuccess={() => {
+            if (typeof sessionStorage !== 'undefined') {
+              sessionStorage.removeItem('pwa_guest_mode');
+            }
+            setIsGuestMode(false);
+            showToast('success', 'Logged In', 'Welcome to InvoiceFlow!');
+          }}
+          onContinueAsGuest={() => {
+            if (typeof sessionStorage !== 'undefined') {
+              sessionStorage.setItem('pwa_guest_mode', 'true');
+            }
+            setIsGuestMode(true);
+            showToast('info', 'Offline / Guest Mode', 'Operating locally with device storage.');
+          }}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
       {/* 1. Security Lock Screen Overlay */}
@@ -556,7 +631,7 @@ function MainApp() {
         user={currentUser}
         authLoading={authLoading}
         isSyncing={isSyncing}
-        onGoogleSignIn={handleGoogleSignIn}
+        onGoogleSignIn={handleOpenLoginScreen}
         onGoogleSignOut={handleGoogleSignOut}
       />
 
@@ -640,7 +715,7 @@ function MainApp() {
             authLoading={authLoading}
             isSyncing={isSyncing}
             lastSyncedTime={lastSyncedTime}
-            onGoogleSignIn={handleGoogleSignIn}
+            onGoogleSignIn={handleOpenLoginScreen}
             onGoogleSignOut={handleGoogleSignOut}
             onSyncToCloud={handleManualSyncToCloud}
             onRestoreFromCloud={handleManualRestoreFromCloud}

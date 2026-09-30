@@ -8,6 +8,8 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   signInWithRedirect,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   getRedirectResult,
   signOut,
   onAuthStateChanged,
@@ -62,6 +64,22 @@ export interface CloudPayload {
   lastSyncedAt?: string;
   version?: string;
 }
+
+/**
+ * Sign in with Email and Password
+ */
+export const loginWithEmail = async (email: string, pass: string): Promise<User | null> => {
+  const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
+  return cred.user;
+};
+
+/**
+ * Register with Email and Password
+ */
+export const registerWithEmail = async (email: string, pass: string): Promise<User | null> => {
+  const cred = await createUserWithEmailAndPassword(auth, email.trim(), pass);
+  return cred.user;
+};
 
 /**
  * Sign in with Google Popup (falls back to redirect if popup is blocked)
