@@ -68,6 +68,8 @@ export const SecurityLockScreen: React.FC<SecurityLockScreenProps> = ({
     try {
       const result = await authenticateBiometrics(businessInfo.name || 'InvoiceFlow');
       if (result.success) {
+        setErrorMessage('');
+        setPinDigits([]);
         onUnlock();
       } else if (result.error && !result.error.toLowerCase().includes('cancel')) {
         setErrorMessage(result.error);

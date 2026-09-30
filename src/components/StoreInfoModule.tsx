@@ -182,10 +182,12 @@ export const StoreInfoModule: React.FC<StoreInfoModuleProps> = ({
   };
 
   const handleTestBiometrics = async () => {
-    setSecurityMessage({ type: 'info', text: 'Prompting for biometric verification...' });
+    setSecurityMessage({ type: 'info', text: 'Prompting for biometric / passkey verification...' });
     const res = await authenticateBiometrics(businessInfo.name || 'InvoiceFlow');
     if (res.success) {
-      setSecurityMessage({ type: 'success', text: 'Biometric verification passed successfully!' });
+      setSecurityMessage({ type: 'success', text: '✓ Fingerprint / Passkey verified successfully on this device!' });
+    } else if (res.error && res.error.toLowerCase().includes('cancel')) {
+      setSecurityMessage({ type: 'info', text: 'Biometric test scan was cancelled.' });
     } else {
       setSecurityMessage({ type: 'error', text: res.error || 'Biometric verification failed.' });
     }
