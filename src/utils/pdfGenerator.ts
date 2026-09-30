@@ -30,7 +30,7 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
   container.style.top = '-9999px';
   container.style.width = '794px'; // Standard A4 pixel width at 96 DPI
   container.style.backgroundColor = '#ffffff';
-  container.style.color = '#0f172a';
+  container.style.color = '#000000';
   container.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
   container.style.boxSizing = 'border-box';
   container.style.zIndex = '-1000';
@@ -268,6 +268,7 @@ export async function captureInvoiceCanvas(
     element.style.setProperty('width', '794px', 'important');
     element.style.setProperty('max-width', '794px', 'important');
     element.style.setProperty('background-color', '#ffffff', 'important');
+    element.style.setProperty('color', '#000000', 'important');
 
     const canvas = await html2canvas(element, {
       scale: 2,
@@ -276,13 +277,51 @@ export async function captureInvoiceCanvas(
       backgroundColor: '#ffffff',
       logging: false,
       onclone: (clonedDoc) => {
-        // Ensure element is visible in clone
-        const clonedEl =
+        // Ensure element is visible and strip/convert unsupported oklch color functions
+        const el =
           clonedDoc.getElementById('invoice-render-area') ||
           clonedDoc.getElementById('printable-invoice');
-        if (clonedEl) {
-          clonedEl.style.display = 'block';
-          clonedEl.style.visibility = 'visible';
+        if (el) {
+          el.style.display = 'block';
+          el.style.visibility = 'visible';
+          el.style.backgroundColor = '#ffffff';
+          el.style.color = '#000000';
+          const elements = el.querySelectorAll('*');
+          elements.forEach((child) => {
+            const htmlEl = child as HTMLElement;
+            try {
+              const style = window.getComputedStyle(htmlEl);
+              if (style.color && style.color.includes('oklch')) {
+                htmlEl.style.color = '#1f2937';
+              }
+              if (style.backgroundColor && style.backgroundColor.includes('oklch')) {
+                htmlEl.style.backgroundColor = '#ffffff';
+              }
+              if (style.borderColor && style.borderColor.includes('oklch')) {
+                htmlEl.style.borderColor = '#e5e7eb';
+              }
+              if (style.borderTopColor && style.borderTopColor.includes('oklch')) {
+                htmlEl.style.borderTopColor = '#e5e7eb';
+              }
+              if (style.borderBottomColor && style.borderBottomColor.includes('oklch')) {
+                htmlEl.style.borderBottomColor = '#e5e7eb';
+              }
+              if (style.borderLeftColor && style.borderLeftColor.includes('oklch')) {
+                htmlEl.style.borderLeftColor = '#e5e7eb';
+              }
+              if (style.borderRightColor && style.borderRightColor.includes('oklch')) {
+                htmlEl.style.borderRightColor = '#e5e7eb';
+              }
+              if (style.boxShadow && style.boxShadow.includes('oklch')) {
+                htmlEl.style.boxShadow = 'none';
+              }
+              if (style.outlineColor && style.outlineColor.includes('oklch')) {
+                htmlEl.style.outlineColor = 'transparent';
+              }
+            } catch {
+              // Ignore computedStyle error
+            }
+          });
         }
       },
     });

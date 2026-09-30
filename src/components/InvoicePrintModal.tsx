@@ -334,46 +334,57 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
         <div className="overflow-y-auto p-5 sm:p-10 bg-slate-100 print:bg-white print:p-0">
           <div
             id="invoice-render-area"
-            className="print-only-container max-w-2xl mx-auto bg-white p-8 sm:p-10 rounded-xl shadow-xs border border-slate-200 text-slate-900 print:shadow-none print:border-none print:p-0"
+            style={{
+              backgroundColor: '#ffffff',
+              color: '#000000',
+              borderColor: '#e2e8f0',
+            }}
+            className="print-only-container max-w-2xl mx-auto p-8 sm:p-10 rounded-xl shadow-xs border print:shadow-none print:border-none print:p-0"
           >
             {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-6 border-b-2 border-slate-900">
+            <div
+              style={{ borderBottomColor: '#0f172a' }}
+              className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-6 border-b-2"
+            >
               <div>
-                <h1 className="text-2xl font-black tracking-tight text-slate-900">
+                <h1 style={{ color: '#0f172a' }} className="text-2xl font-black tracking-tight">
                   {businessInfo.name}
                 </h1>
                 {businessInfo.tagline && (
-                  <p className="text-xs text-emerald-800 font-medium italic mt-0.5">
+                  <p style={{ color: '#047857' }} className="text-xs font-medium italic mt-0.5">
                     {businessInfo.tagline}
                   </p>
                 )}
-                <div className="text-xs text-slate-600 mt-1 space-y-0.5">
+                <div style={{ color: '#475569' }} className="text-xs mt-1 space-y-0.5">
                   <p>Phone: {businessInfo.phone}</p>
                   <p>Address: {businessInfo.address}</p>
                 </div>
               </div>
 
               <div className="text-left sm:text-right">
-                <div className="text-3xl font-extrabold tracking-tight text-slate-900">
+                <div style={{ color: '#0f172a' }} className="text-3xl font-extrabold tracking-tight">
                   INVOICE
                 </div>
-                <div className="font-mono text-sm font-bold text-slate-800 mt-1">
+                <div style={{ color: '#0f172a' }} className="font-mono text-sm font-bold mt-1">
                   #{invoice.invoiceNumber}
                 </div>
-                <div className="text-xs text-slate-600 mt-0.5">
-                  Date: <span className="font-medium text-slate-800">{formatDate(invoice.invoiceDate)}</span>
+                <div style={{ color: '#475569' }} className="text-xs mt-0.5">
+                  Date: <span style={{ color: '#0f172a' }} className="font-medium">{formatDate(invoice.invoiceDate)}</span>
                 </div>
               </div>
             </div>
 
             {/* Customer Box */}
-            <div className="my-6 p-4 rounded-lg bg-slate-50 border border-slate-200">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+            <div
+              style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}
+              className="my-6 p-4 rounded-lg border"
+            >
+              <span style={{ color: '#64748b' }} className="text-[11px] font-bold uppercase tracking-wider block mb-1">
                 Billed Customer
               </span>
-              <p className="text-base font-bold text-slate-900">{invoice.customerName}</p>
+              <p style={{ color: '#0f172a' }} className="text-base font-bold">{invoice.customerName}</p>
               {invoice.customerPhone && (
-                <p className="text-xs text-slate-600 mt-0.5">Phone: {invoice.customerPhone}</p>
+                <p style={{ color: '#475569' }} className="text-xs mt-0.5">Phone: {invoice.customerPhone}</p>
               )}
             </div>
 
@@ -381,24 +392,37 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
             <div className="my-6 overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="border-b-2 border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wider text-slate-700">
+                  <tr
+                    style={{
+                      backgroundColor: '#0f172a',
+                      color: '#ffffff',
+                      borderBottomColor: '#0f172a',
+                    }}
+                    className="border-b-2 text-[11px] uppercase tracking-wider"
+                  >
                     <th className="py-2.5 px-3 font-bold">Item Description</th>
                     <th className="py-2.5 px-3 text-right font-bold w-16">Qty</th>
                     <th className="py-2.5 px-3 text-right font-bold w-28">Unit Price</th>
                     <th className="py-2.5 px-3 text-right font-bold w-28">Amount</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody>
                   {invoice.items.map((it, idx) => (
-                    <tr key={it.id || idx}>
-                      <td className="py-3 px-3 font-semibold text-slate-800">{it.name}</td>
-                      <td className="py-3 px-3 text-right font-mono tabular-nums text-slate-600">
+                    <tr
+                      key={it.id || idx}
+                      style={{
+                        borderBottom: '1px solid #e2e8f0',
+                        backgroundColor: idx % 2 === 1 ? '#f8fafc' : '#ffffff',
+                      }}
+                    >
+                      <td style={{ color: '#1e293b' }} className="py-3 px-3 font-semibold">{it.name}</td>
+                      <td style={{ color: '#334155' }} className="py-3 px-3 text-right font-mono tabular-nums">
                         {it.quantity}
                       </td>
-                      <td className="py-3 px-3 text-right font-mono tabular-nums text-slate-600">
+                      <td style={{ color: '#334155' }} className="py-3 px-3 text-right font-mono tabular-nums">
                         {formatRupees(it.unitPrice)}
                       </td>
-                      <td className="py-3 px-3 text-right font-mono tabular-nums font-bold text-slate-900">
+                      <td style={{ color: '#0f172a' }} className="py-3 px-3 text-right font-mono tabular-nums font-bold">
                         {formatRupees(it.amount)}
                       </td>
                     </tr>
@@ -408,44 +432,58 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
             </div>
 
             {/* Totals Section */}
-            <div className="flex justify-end pt-2 pb-6 border-b border-slate-200">
-              <div className="w-full sm:w-80 space-y-2 text-xs">
+            <div style={{ borderBottomColor: '#e2e8f0' }} className="flex justify-end pt-2 pb-6 border-b">
+              <div
+                style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}
+                className="w-full sm:w-80 p-4 rounded-lg border space-y-2 text-xs"
+              >
                 {/* Items Subtotal */}
-                <div className="flex justify-between text-slate-600">
+                <div style={{ color: '#475569' }} className="flex justify-between">
                   <span>Items Subtotal:</span>
-                  <span className="font-mono tabular-nums font-bold text-slate-900">
+                  <span style={{ color: '#0f172a' }} className="font-mono tabular-nums font-bold">
                     {formatRupees(invoice.subtotal)}
                   </span>
                 </div>
 
                 {/* Previous Balance */}
-                <div className="flex justify-between text-slate-600">
+                <div style={{ color: '#475569' }} className="flex justify-between">
                   <span>Previous Balance:</span>
-                  <span className="font-mono tabular-nums font-semibold text-amber-800">
+                  <span style={{ color: '#b45309' }} className="font-mono tabular-nums font-semibold">
                     {formatRupees(invoice.previousBalance)}
                   </span>
                 </div>
 
                 {/* Total Bill */}
-                <div className="flex justify-between items-baseline pt-2 border-t border-slate-200 text-sm font-bold text-slate-900">
+                <div
+                  style={{ color: '#0f172a', borderTopColor: '#cbd5e1' }}
+                  className="flex justify-between items-baseline pt-2 border-t text-sm font-bold"
+                >
                   <span>Total Bill:</span>
-                  <span className="text-base font-mono tabular-nums font-extrabold text-slate-900">
+                  <span style={{ color: '#0f172a' }} className="text-base font-mono tabular-nums font-extrabold">
                     {formatRupees(totalBill)}
                   </span>
                 </div>
 
                 {/* Payment Received */}
-                <div className="flex justify-between text-slate-600 pt-0.5">
-                  <span className="text-sky-800 font-semibold">Payment Received:</span>
-                  <span className="font-mono tabular-nums font-bold text-sky-800">
+                <div style={{ color: '#0369a1' }} className="flex justify-between pt-0.5">
+                  <span className="font-semibold">Payment Received:</span>
+                  <span className="font-mono tabular-nums font-bold">
                     {formatRupees(paymentReceived)}
                   </span>
                 </div>
 
                 {/* Remaining Balance */}
-                <div className="flex justify-between items-baseline pt-2 border-t-2 border-slate-900 text-sm font-bold text-slate-900">
+                <div
+                  style={{ color: '#0f172a', borderTopColor: '#0f172a' }}
+                  className="flex justify-between items-baseline pt-2 border-t-2 text-sm font-bold"
+                >
                   <span>Remaining Balance:</span>
-                  <span className={`text-lg font-mono tabular-nums font-extrabold ${remainingBalance === 0 ? 'text-emerald-700' : remainingBalance > 0 ? 'text-amber-800' : 'text-sky-700'}`}>
+                  <span
+                    style={{
+                      color: remainingBalance === 0 ? '#047857' : remainingBalance > 0 ? '#b45309' : '#0369a1',
+                    }}
+                    className="text-lg font-mono tabular-nums font-extrabold"
+                  >
                     {formatRupees(remainingBalance)}
                   </span>
                 </div>
@@ -453,7 +491,7 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
             </div>
 
             {/* Footer */}
-            <div className="mt-6 pt-4 text-center text-[11px] text-slate-600">
+            <div style={{ color: '#64748b' }} className="mt-6 pt-4 text-center text-[11px]">
               Thank you for your business! Please keep this invoice for your records.
             </div>
           </div>

@@ -1,6 +1,9 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getAuth,
+  setPersistence,
+  browserLocalPersistence,
+  indexedDBLocalPersistence,
   GoogleAuthProvider,
   signInWithPopup,
   signInWithRedirect,
@@ -34,6 +37,17 @@ export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
+// Explicitly set Firebase Auth persistence to browserLocalPersistence to prevent session loss on refresh
+if (typeof window !== 'undefined') {
+  setPersistence(auth, browserLocalPersistence)
+    .catch((error) => {
+      console.warn('Failed to set browserLocalPersistence, trying indexedDB fallback:', error);
+      setPersistence(auth, indexedDBLocalPersistence).catch((fallbackError) => {
+        console.error('Failed to set auth persistence fallback:', fallbackError);
+      });
+    });
+}
+
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
   prompt: 'select_account',
@@ -51,6 +65,12 @@ export interface CloudPayload {
  * Sign in with Google Popup (falls back to redirect if popup is blocked)
  */
 export const loginWithGoogle = async (): Promise<User | null> => {
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+  } catch (pErr) {
+    console.warn('Could not set persistence before popup login:', pErr);
+  }
+
   try {
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
