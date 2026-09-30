@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import { Invoice, BusinessInfo } from '../types/invoice';
 import { formatRupees, formatDate, cleanPhoneForWhatsApp } from './formatters';
 
@@ -277,6 +277,7 @@ export async function captureInvoiceCanvas(
       backgroundColor: '#ffffff',
       logging: false,
       onclone: (clonedDoc) => {
+        const win = clonedDoc.defaultView || window;
         // Ensure element is visible and strip/convert unsupported oklch color functions
         const el =
           clonedDoc.getElementById('invoice-render-area') ||
@@ -290,7 +291,7 @@ export async function captureInvoiceCanvas(
           elements.forEach((child) => {
             const htmlEl = child as HTMLElement;
             try {
-              const style = window.getComputedStyle(htmlEl);
+              const style = win.getComputedStyle(htmlEl);
               if (style.color && style.color.includes('oklch')) {
                 htmlEl.style.color = '#1f2937';
               }
