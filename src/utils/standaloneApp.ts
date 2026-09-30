@@ -1916,7 +1916,7 @@ export const downloadStandaloneHtmlApp = () => {
         });
         selM.value = new Date().getMonth();
 
-        for (var y = 2024; y <= 2030; y++) {
+        for (var y = 2030; y >= 2020; y--) {
           var optY = document.createElement('option');
           optY.value = y;
           optY.innerText = y;
@@ -2005,7 +2005,7 @@ export const downloadStandaloneHtmlApp = () => {
       var selCust = document.getElementById('yearlySelectCustomer');
 
       if (selY.children.length === 0) {
-        for (var y = 2024; y <= 2030; y++) {
+        for (var y = 2030; y >= 2020; y--) {
           var optY = document.createElement('option');
           optY.value = y;
           optY.innerText = y;

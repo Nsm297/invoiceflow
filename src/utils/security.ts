@@ -60,7 +60,7 @@ export const isBiometricSupported = async (): Promise<boolean> => {
  */
 export const registerBiometrics = async (rpName: string = 'InvoiceFlow'): Promise<{ success: boolean; credentialId?: string; error?: string }> => {
   if (typeof window === 'undefined' || !navigator.credentials) {
-    return { success: false, error: 'WebAuthn is not supported in this environment.' };
+    return { success: false, error: 'Biometric authentication (WebAuthn) is not supported in this browser.' };
   }
 
   try {
@@ -98,16 +98,28 @@ export const registerBiometrics = async (rpName: string = 'InvoiceFlow'): Promis
       },
     };
 
-    const credential = await navigator.credentials.create(options) as PublicKeyCredential | null;
+    const credential = (await navigator.credentials.create(options)) as PublicKeyCredential | null;
     if (credential && credential.id) {
       return { success: true, credentialId: credential.id };
     }
     return { success: true, credentialId: 'biometric-active' };
   } catch (err: any) {
     console.warn('WebAuthn registration error:', err);
+    const errName = err?.name || '';
+    const errMsg = (err?.message || '').toLowerCase();
+
+    if (errName === 'AbortError' || errMsg.includes('cancel') || errMsg.includes('abort')) {
+      return { success: false, error: 'Biometric registration was cancelled.' };
+    }
+    if (errName === 'NotAllowedError' || errMsg.includes('not allowed') || errMsg.includes('timed out')) {
+      return {
+        success: false,
+        error: 'Biometric registration timed out or was dismissed. Please try again.',
+      };
+    }
     return {
       success: false,
-      error: err?.message || 'Biometric authentication was cancelled or not supported.',
+      error: 'Could not register biometric key. Ensure your device has fingerprint or Face ID enabled.',
     };
   }
 };
@@ -117,7 +129,18 @@ export const registerBiometrics = async (rpName: string = 'InvoiceFlow'): Promis
  */
 export const authenticateBiometrics = async (rpName: string = 'InvoiceFlow'): Promise<{ success: boolean; error?: string }> => {
   if (typeof window === 'undefined' || !navigator.credentials) {
-    return { success: false, error: 'WebAuthn is not supported.' };
+    return {
+      success: false,
+      error: 'No fingerprint registered on this device yet. Please unlock using PIN first, then enable Biometrics in settings.',
+    };
+  }
+
+  const config = getStoredSecurityConfig();
+  if (!config.biometricEnabled) {
+    return {
+      success: false,
+      error: 'No fingerprint registered on this device yet. Please unlock using PIN first, then enable Biometrics in settings.',
+    };
   }
 
   try {
@@ -140,12 +163,23 @@ export const authenticateBiometrics = async (rpName: string = 'InvoiceFlow'): Pr
     if (assertion) {
       return { success: true };
     }
-    return { success: false, error: 'Verification failed.' };
-  } catch (err: any) {
-    console.warn('Biometric unlock cancelled or failed:', err);
     return {
       success: false,
-      error: err?.message || 'Biometric verification cancelled.',
+      error: 'No fingerprint registered on this device yet. Please unlock using PIN first, then enable Biometrics in settings.',
+    };
+  } catch (err: any) {
+    console.warn('Biometric unlock check:', err);
+    const errName = err?.name || '';
+    const errMsg = (err?.message || '').toLowerCase();
+
+    if (errName === 'AbortError' || errMsg.includes('user cancelled') || errMsg.includes('abort')) {
+      return { success: false, error: 'Biometric scan cancelled.' };
+    }
+
+    // Handle "No passkeys available", "operation timed out/not allowed", or missing credentials cleanly without W3C raw errors
+    return {
+      success: false,
+      error: 'No fingerprint registered on this device yet. Please unlock using PIN first, then enable Biometrics in settings.',
     };
   }
 };

@@ -28,10 +28,15 @@ export const MonthlyStatement: React.FC<MonthlyStatementProps> = ({
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('all');
   const [showPrintPreview, setShowPrintPreview] = useState<boolean>(false);
 
-  // Extract available years from invoices
+  // Dynamically generate a broad year range (e.g., from 2020 to 2030) merged with any existing invoice years
   const availableYears = useMemo(() => {
     const years = new Set<number>();
-    years.add(currentDate.getFullYear());
+    const currYear = currentDate.getFullYear();
+    const minYear = Math.min(2020, currYear - 5);
+    const maxYear = Math.max(2030, currYear + 4);
+    for (let y = minYear; y <= maxYear; y++) {
+      years.add(y);
+    }
     invoices.forEach((inv) => {
       if (inv.invoiceDate) {
         const y = new Date(inv.invoiceDate).getFullYear();
