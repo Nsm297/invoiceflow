@@ -4,11 +4,27 @@ import { Invoice, BusinessInfo } from '../types/invoice';
 import { formatRupees, formatDate, cleanPhoneForWhatsApp } from './formatters';
 
 /**
+ * Friendly error helper that triggers alert('Image Error: ' + error.message)
+ * while safely logging to console.
+ */
+function handleImageError(error: any): void {
+  const message = error?.message || String(error);
+  try {
+    if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+      window.alert('Image Error: ' + message);
+    }
+  } catch {
+    console.error('Image Error: ' + message);
+  }
+}
+
+/**
  * Builds an off-screen HTML element representation of the invoice
  * styled and formatted for crisp single-image rendering (794px width).
  */
 function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo): HTMLDivElement {
   const container = document.createElement('div');
+  container.id = 'invoice-render-area';
   container.style.position = 'fixed';
   container.style.left = '-9999px';
   container.style.top = '-9999px';
@@ -206,16 +222,21 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
 
 /**
  * Captures the invoice DOM element as a high-resolution HTML Canvas:
- * 1. Temporarily removes box-shadow, border-radius, margin, and card-style outer borders.
- * 2. Uses html2canvas with scale: 2 and backgroundColor: '#ffffff' for high-quality rendering.
- * 3. Restores original element styles after capture.
+ * 1. Ensures target DOM element exists before calling html2canvas (document.getElementById('invoice-render-area')).
+ * 2. Uses robust html2canvas configuration with scale: 2, useCORS: true, allowTaint: true, and onclone visibility hook.
+ * 3. Removes outer card borders/shadows and restores original styles cleanly.
  */
 export async function captureInvoiceCanvas(
   invoice: Invoice,
   businessInfo: BusinessInfo,
   sourceElement?: HTMLElement | null
 ): Promise<HTMLCanvasElement> {
-  let element = sourceElement || (document.getElementById('printable-invoice') as HTMLElement | null);
+  // Ensure target DOM element exists
+  let element =
+    sourceElement ||
+    (document.getElementById('invoice-render-area') as HTMLElement | null) ||
+    (document.getElementById('printable-invoice') as HTMLElement | null);
+
   let isCreated = false;
 
   if (!element) {
@@ -238,7 +259,7 @@ export async function captureInvoiceCanvas(
   };
 
   try {
-    // 1. Temporarily remove box-shadow, border-radius, margin, and extra card borders
+    // Temporarily remove card-style box-shadow, border-radius, margin, and borders
     element.style.setProperty('box-shadow', 'none', 'important');
     element.style.setProperty('border-radius', '0', 'important');
     element.style.setProperty('border', 'none', 'important');
@@ -248,18 +269,27 @@ export async function captureInvoiceCanvas(
     element.style.setProperty('max-width', '794px', 'important');
     element.style.setProperty('background-color', '#ffffff', 'important');
 
-    // 2. High-quality capture (scale: 2, backgroundColor: '#ffffff')
     const canvas = await html2canvas(element, {
       scale: 2,
       useCORS: true,
-      logging: false,
+      allowTaint: true,
       backgroundColor: '#ffffff',
-      windowWidth: 794,
+      logging: false,
+      onclone: (clonedDoc) => {
+        // Ensure element is visible in clone
+        const clonedEl =
+          clonedDoc.getElementById('invoice-render-area') ||
+          clonedDoc.getElementById('printable-invoice');
+        if (clonedEl) {
+          clonedEl.style.display = 'block';
+          clonedEl.style.visibility = 'visible';
+        }
+      },
     });
 
     return canvas;
   } finally {
-    // 3. Restore original styles on the DOM element
+    // Restore original styles on the DOM element
     if (isCreated && element.parentNode) {
       element.parentNode.removeChild(element);
     } else if (element) {
@@ -277,60 +307,36 @@ export async function captureInvoiceCanvas(
 }
 
 /**
- * Converts invoice canvas to a JPG Blob and File object (image/jpeg, quality: 0.95).
- */
-export async function generateInvoiceImageBlob(
-  invoice: Invoice,
-  businessInfo: BusinessInfo,
-  sourceElement?: HTMLElement | null
-): Promise<{ blob: Blob; imageFile: File; filename: string }> {
-  const invoiceNumber = invoice.invoiceNumber || 'INV';
-  const cleanInvNumber = invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const filename = `Invoice_${cleanInvNumber}.jpg`;
-
-  const canvas = await captureInvoiceCanvas(invoice, businessInfo, sourceElement);
-
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) {
-          reject(new Error('Failed to generate image blob from canvas'));
-          return;
-        }
-        const imageFile = new File([blob], filename, { type: 'image/jpeg' });
-        resolve({ blob, imageFile, filename });
-      },
-      'image/jpeg',
-      0.95
-    );
-  });
-}
-
-/**
- * Downloads invoice directly as a high-quality JPG image photo.
+ * Robust JPG Download Logic:
+ * Converts canvas directly to dataUrl and downloads using anchor tag.
+ * Wrapped in strict try/catch with alert('Image Error: ' + error.message).
  */
 export async function downloadInvoiceImage(
   invoice: Invoice,
   businessInfo: BusinessInfo,
   sourceElement?: HTMLElement | null
 ): Promise<string> {
-  const { blob, filename } = await generateInvoiceImageBlob(invoice, businessInfo, sourceElement);
-  const link = document.createElement('a');
-  link.download = filename;
-  const url = URL.createObjectURL(blob);
-  link.href = url;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
-  return filename;
+  const invoiceNumber = invoice.invoiceNumber || 'INV';
+  try {
+    const canvas = await captureInvoiceCanvas(invoice, businessInfo, sourceElement);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    const link = document.createElement('a');
+    link.download = `Invoice_${invoiceNumber}.jpg`;
+    link.href = dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return `Invoice_${invoiceNumber}.jpg`;
+  } catch (error: any) {
+    handleImageError(error);
+    throw error;
+  }
 }
 
 /**
- * Direct WhatsApp Image Share:
- * Captures invoice element at high quality (scale: 2, backgroundColor: '#ffffff'),
- * converts result to JPG File object (quality: 0.95), and uses Web Share API
- * or triggers JPG download fallback while opening WhatsApp chat.
+ * Reliable WhatsApp Share with Fallback:
+ * Uses canvas.toBlob, checks Web Share API for files, or downloads image and opens WhatsApp chat.
+ * Wrapped in strict try/catch with alert('Image Error: ' + error.message).
  */
 export async function shareInvoiceViaWhatsAppImage(
   invoice: Invoice,
@@ -339,69 +345,69 @@ export async function shareInvoiceViaWhatsAppImage(
 ): Promise<'shared' | 'opened_wa_and_downloaded' | 'cancelled'> {
   const invoiceNumber = invoice.invoiceNumber || 'INV';
   const phone = cleanPhoneForWhatsApp(invoice.customerPhone || '');
-  const canvas = await captureInvoiceCanvas(invoice, businessInfo, sourceElement);
 
-  return new Promise((resolve) => {
-    canvas.toBlob(
-      async (blob) => {
-        if (!blob) {
-          resolve('cancelled');
-          return;
-        }
+  try {
+    const canvas = await captureInvoiceCanvas(invoice, businessInfo, sourceElement);
 
-        const imageFile = new File([blob], `Invoice_${invoiceNumber}.jpg`, { type: 'image/jpeg' });
-
-        if (navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+    return await new Promise<'shared' | 'opened_wa_and_downloaded' | 'cancelled'>((resolve, reject) => {
+      canvas.toBlob(
+        async (blob) => {
           try {
-            await navigator.share({
-              title: 'Invoice',
-              text: `Invoice #${invoiceNumber}`,
-              files: [imageFile],
-            });
-            resolve('shared');
-          } catch (err: any) {
-            if (err.name === 'AbortError') {
-              resolve('cancelled');
-              return;
+            if (!blob) throw new Error('Canvas blob creation failed.');
+            const imageFile = new File([blob], `Invoice_${invoiceNumber}.jpg`, { type: 'image/jpeg' });
+
+            if (navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+              try {
+                await navigator.share({
+                  title: `Invoice #${invoiceNumber}`,
+                  files: [imageFile],
+                });
+                resolve('shared');
+              } catch (err: any) {
+                if (err.name === 'AbortError') {
+                  resolve('cancelled');
+                  return;
+                }
+                // Fallback: Download image first and open WhatsApp
+                const link = document.createElement('a');
+                link.download = `Invoice_${invoiceNumber}.jpg`;
+                link.href = URL.createObjectURL(blob);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.open(
+                  `https://wa.me/${phone}?text=${encodeURIComponent(`Invoice #${invoiceNumber} JPG downloaded.`)}`,
+                  '_blank'
+                );
+                resolve('opened_wa_and_downloaded');
+              }
+            } else {
+              // Download image first and open WhatsApp
+              const link = document.createElement('a');
+              link.download = `Invoice_${invoiceNumber}.jpg`;
+              link.href = URL.createObjectURL(blob);
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              window.open(
+                `https://wa.me/${phone}?text=${encodeURIComponent(`Invoice #${invoiceNumber} JPG downloaded.`)}`,
+                '_blank'
+              );
+              resolve('opened_wa_and_downloaded');
             }
-            // Download image fallback if share dismissed or failed
-            const link = document.createElement('a');
-            link.download = `Invoice_${invoiceNumber}.jpg`;
-            const url = URL.createObjectURL(blob);
-            link.href = url;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            setTimeout(() => URL.revokeObjectURL(url), 5000);
-
-            window.open(
-              `https://wa.me/${phone}?text=${encodeURIComponent(`Invoice #${invoiceNumber}`)}`,
-              '_blank'
-            );
-            resolve('opened_wa_and_downloaded');
+          } catch (blobErr) {
+            handleImageError(blobErr);
+            reject(blobErr);
           }
-        } else {
-          // Download image fallback
-          const link = document.createElement('a');
-          link.download = `Invoice_${invoiceNumber}.jpg`;
-          const url = URL.createObjectURL(blob);
-          link.href = url;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          setTimeout(() => URL.revokeObjectURL(url), 5000);
-
-          window.open(
-            `https://wa.me/${phone}?text=${encodeURIComponent(`Invoice #${invoiceNumber}`)}`,
-            '_blank'
-          );
-          resolve('opened_wa_and_downloaded');
-        }
-      },
-      'image/jpeg',
-      0.95
-    );
-  });
+        },
+        'image/jpeg',
+        0.95
+      );
+    });
+  } catch (error: any) {
+    handleImageError(error);
+    throw error;
+  }
 }
 
 /**

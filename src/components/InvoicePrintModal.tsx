@@ -40,9 +40,9 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
   const handleDownloadJPG = async () => {
     try {
       setIsGeneratingJPG(true);
-      const printElement = document.getElementById('printable-invoice');
+      const printElement = document.getElementById('invoice-render-area') || document.getElementById('printable-invoice');
       await downloadInvoiceImage(invoice, businessInfo, printElement);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to generate JPG image:', err);
     } finally {
       setIsGeneratingJPG(false);
@@ -52,9 +52,9 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
   const handleDownloadPDF = async () => {
     try {
       setIsGeneratingPDF(true);
-      const printElement = document.getElementById('printable-invoice');
+      const printElement = document.getElementById('invoice-render-area') || document.getElementById('printable-invoice');
       await downloadInvoicePDF(invoice, businessInfo, printElement);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to generate PDF:', err);
       // Fallback to browser print
       window.print();
@@ -70,9 +70,9 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
     }
     try {
       setIsSharingWA(true);
-      const printElement = document.getElementById('printable-invoice');
+      const printElement = document.getElementById('invoice-render-area') || document.getElementById('printable-invoice');
       await shareInvoiceViaWhatsAppImage(invoice, businessInfo, printElement);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to share image on WhatsApp:', err);
     } finally {
       setIsSharingWA(false);
@@ -333,7 +333,7 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
         {/* Scrollable Printable Document */}
         <div className="overflow-y-auto p-5 sm:p-10 bg-slate-100 print:bg-white print:p-0">
           <div
-            id="printable-invoice"
+            id="invoice-render-area"
             className="print-only-container max-w-2xl mx-auto bg-white p-8 sm:p-10 rounded-xl shadow-xs border border-slate-200 text-slate-900 print:shadow-none print:border-none print:p-0"
           >
             {/* Header */}
