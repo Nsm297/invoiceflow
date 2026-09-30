@@ -5,7 +5,7 @@ import { formatRupees, formatDate, cleanPhoneForWhatsApp, generateWhatsAppInvoic
 
 /**
  * Builds an off-screen HTML element representation of the invoice
- * optimized for single-page A4 auto-scaling.
+ * styled and formatted for crisp single-page A4 rendering.
  */
 function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo): HTMLDivElement {
   const container = document.createElement('div');
@@ -13,7 +13,6 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
   container.style.left = '-9999px';
   container.style.top = '-9999px';
   container.style.width = '794px'; // Standard A4 pixel width at 96 DPI
-  container.style.minHeight = '1123px';
   container.style.backgroundColor = '#ffffff';
   container.style.color = '#0f172a';
   container.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
@@ -22,14 +21,13 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
 
   const itemsCount = invoice.items?.length || 0;
 
-  // Dynamic sizing based on number of items to guarantee 1-page fit
+  // Responsive padding and typography based on item density
   let bodyPadding = '32px 36px';
   let headerMarginBottom = '16px';
   let tablePadding = '8px 10px';
   let fontSizeBase = '12px';
   let fontHeading = '20px';
   let fontInvNumber = '24px';
-  let rowHeight = 'auto';
   let compactSummary = false;
 
   if (itemsCount > 18) {
@@ -88,7 +86,7 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
     .join('');
 
   container.innerHTML = `
-    <div style="display: flex; flex-direction: column; height: 100%; justify-content: space-between; box-sizing: border-box;">
+    <div style="display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; min-height: 100%;">
       <div>
         <!-- Store & Invoice Header -->
         <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: ${headerMarginBottom}; border-bottom: 2px solid #0f172a; margin-bottom: ${headerMarginBottom};">
@@ -203,13 +201,18 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
 }
 
 /**
- * Generates an A4 single-page PDF as a Blob and File object.
- * Guaranteed 1-page fit using dynamic scale and jsPDF configuration (autoPaging: false).
+ * Generates strict Single-Page A4 PDF with exact auto-scaling ratio:
+ * 1. A4 dimensions: pdfWidth = 210mm, pdfHeight = 297mm.
+ * 2. scaledImgHeight = (canvas.height * pdfWidth) / canvas.width.
+ * 3. If scaledImgHeight > pdfHeight: scaleFactor = pdfHeight / scaledImgHeight.
+ * 4. Apply scaleFactor to BOTH width and height: finalWidth = pdfWidth * scaleFactor, finalHeight = scaledImgHeight * scaleFactor.
+ *    Center horizontally on page: xOffset = (pdfWidth - finalWidth) / 2.
+ * 5. Single page forced: doc.addPage() is NEVER called under any condition.
  */
 export async function generateInvoicePDF(
   invoice: Invoice,
   businessInfo: BusinessInfo
-): Promise<{ blob: Blob; file: File; filename: string; pdf: jsPDF }> {
+): Promise<{ doc: jsPDF; pdfBlob: Blob; pdfFile: File; filename: string }> {
   const element = createInvoicePrintElement(invoice, businessInfo);
   document.body.appendChild(element);
 
@@ -222,7 +225,7 @@ export async function generateInvoicePDF(
       windowWidth: 794,
     });
 
-    const pdf = new jsPDF({
+    const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4',
@@ -230,39 +233,40 @@ export async function generateInvoicePDF(
       putOnlyUsedFonts: true,
     });
 
-    const pdfPageWidth = 210;
-    const pdfPageHeight = 297;
-    const margin = 8; // 8mm margin
-    const contentMaxWidth = pdfPageWidth - margin * 2; // 194mm
-    const contentMaxHeight = pdfPageHeight - margin * 2; // 281mm
+    const pdfWidth = 210; // A4 width in mm
+    const pdfHeight = 297; // A4 height in mm
 
-    const imgWidth = contentMaxWidth;
-    let imgHeight = (canvas.height * imgWidth) / canvas.width;
+    // Calculate initial scaled image height based on full page width
+    const scaledImgHeight = (canvas.height * pdfWidth) / canvas.width;
 
-    // Single-page auto-fitting: if height exceeds single A4 page, scale down proportionally
-    if (imgHeight > contentMaxHeight) {
-      const scaleFactor = contentMaxHeight / imgHeight;
-      imgHeight = contentMaxHeight;
-      const adjustedWidth = imgWidth * scaleFactor;
-      const xOffset = (pdfPageWidth - adjustedWidth) / 2;
-      const yOffset = margin;
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      pdf.addImage(imgData, 'JPEG', xOffset, yOffset, adjustedWidth, imgHeight, undefined, 'FAST');
+    let finalWidth = pdfWidth;
+    let finalHeight = scaledImgHeight;
+    let xOffset = 0;
+    let yOffset = 0;
+
+    // Strict single-page scaling ratio
+    if (scaledImgHeight > pdfHeight) {
+      const scaleFactor = pdfHeight / scaledImgHeight;
+      finalWidth = pdfWidth * scaleFactor;
+      finalHeight = scaledImgHeight * scaleFactor; // equals pdfHeight
+      xOffset = (pdfWidth - finalWidth) / 2; // Center horizontally
+      yOffset = 0;
     } else {
-      const xOffset = margin;
-      const yOffset = margin;
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      pdf.addImage(imgData, 'JPEG', xOffset, yOffset, imgWidth, imgHeight, undefined, 'FAST');
+      xOffset = 0;
+      yOffset = (pdfHeight - scaledImgHeight) > 10 ? 4 : 0;
     }
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    doc.addImage(imgData, 'JPEG', xOffset, yOffset, finalWidth, finalHeight, undefined, 'FAST');
 
     const cleanCustName = (invoice.customerName || 'Customer').replace(/[^a-zA-Z0-9_-]/g, '_');
     const cleanInvNumber = (invoice.invoiceNumber || 'INV').replace(/[^a-zA-Z0-9_-]/g, '_');
     const filename = `Invoice_${cleanInvNumber}_${cleanCustName}.pdf`;
 
-    const blob = pdf.output('blob');
-    const file = new File([blob], filename, { type: 'application/pdf' });
+    const pdfBlob = doc.output('blob');
+    const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
 
-    return { blob, file, filename, pdf };
+    return { doc, pdfBlob, pdfFile, filename };
   } finally {
     if (element.parentNode) {
       element.parentNode.removeChild(element);
@@ -277,79 +281,61 @@ export async function downloadInvoicePDF(
   invoice: Invoice,
   businessInfo: BusinessInfo
 ): Promise<string> {
-  const { blob, filename } = await generateInvoicePDF(invoice, businessInfo);
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  const { doc, filename } = await generateInvoicePDF(invoice, businessInfo);
+  doc.save(filename);
   return filename;
 }
 
 /**
- * Primary WhatsApp Sharing Handler with Web Share API file capability:
- * 1. Generates single-page invoice PDF File object.
- * 2. If navigator.canShare({ files: [pdfFile] }) is supported (e.g. mobile/supported browsers),
- *    invokes navigator.share() to send the actual PDF document directly to WhatsApp.
- * 3. If file sharing is unsupported (e.g. desktop web), triggers automatic PDF file download
- *    while opening WhatsApp with the customer's chat message and breakdown.
+ * Send Actual PDF File via WhatsApp (Web Share API):
+ * 1. Generates single-page PDF and creates File object:
+ *    const pdfFile = new File([pdfBlob], 'Invoice.pdf', { type: 'application/pdf' });
+ * 2. If navigator.canShare && navigator.canShare({ files: [pdfFile] }):
+ *    Invokes await navigator.share({ files: [pdfFile], title: 'Invoice PDF', text: 'Here is your invoice PDF' }).
+ *    This opens native Android/iOS share sheet directly showing WhatsApp with the PDF attached!
+ * 3. If false (Desktop Web), triggers PDF download doc.save('Invoice.pdf') and opens https://wa.me/...
+ *    with the invoice summary message.
  */
 export async function shareInvoiceWithPDF(
   invoice: Invoice,
   businessInfo: BusinessInfo
 ): Promise<'shared_file' | 'opened_wa_and_downloaded' | 'cancelled'> {
-  // Step 1: Generate single-page PDF
-  const { file, filename } = await generateInvoicePDF(invoice, businessInfo);
+  // Step 1: Generate strict single-page PDF
+  const { doc, pdfFile, filename } = await generateInvoicePDF(invoice, businessInfo);
 
-  // Step 2: Check if Web Share API with Files is supported
-  const isMobile =
-    typeof navigator !== 'undefined' &&
-    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
+  // Step 2: Check Web Share API for native file sharing (Mobile devices)
   const canShareFiles =
     typeof navigator !== 'undefined' &&
     typeof navigator.share === 'function' &&
     typeof (navigator as any).canShare === 'function' &&
-    (navigator as any).canShare({ files: [file] });
+    (navigator as any).canShare({ files: [pdfFile] });
 
   if (canShareFiles) {
     try {
       await navigator.share({
-        files: [file],
-        title: `Invoice #${invoice.invoiceNumber || ''} - ${businessInfo.name || 'InvoiceFlow'}`,
-        text: `Invoice #${invoice.invoiceNumber || ''} for ${invoice.customerName || 'Customer'} (Total: ${formatRupees(invoice.totalBill)})`,
+        files: [pdfFile],
+        title: 'Invoice PDF',
+        text: `Here is your invoice PDF (#${invoice.invoiceNumber || ''}) from ${businessInfo.name || 'InvoiceFlow'}.`,
       });
       return 'shared_file';
     } catch (err: any) {
       if (err.name === 'AbortError') {
         return 'cancelled';
       }
-      // If user dismissed share sheet or failed, fallback to download + WA web
+      // If user cancelled or error occurred, proceed to fallback
     }
   }
 
   // Fallback for Desktop Web or non-file share browsers:
-  // Auto-download PDF and open WhatsApp Web with formatted summary
+  // Trigger PDF download doc.save(filename) and open https://wa.me/...
+  doc.save(filename);
+
   const cleanPhone = cleanPhoneForWhatsApp(invoice.customerPhone || '');
   const message = generateWhatsAppInvoiceMessage(invoice, businessInfo);
   const waUrl = cleanPhone
     ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`
     : `https://wa.me/?text=${encodeURIComponent(message)}`;
 
-  // 1. Download the PDF file automatically
-  const downloadUrl = URL.createObjectURL(file);
-  const downloadLink = document.createElement('a');
-  downloadLink.href = downloadUrl;
-  downloadLink.download = filename;
-  document.body.appendChild(downloadLink);
-  downloadLink.click();
-  document.body.removeChild(downloadLink);
-  setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
-
-  // 2. Open WhatsApp
   window.open(waUrl, '_blank');
 
   return 'opened_wa_and_downloaded';
