@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Invoice, Customer, BusinessInfo } from '../types/invoice';
 import { MonthlyStatement } from '../components/MonthlyStatement';
 import { YearlyStatement } from '../components/YearlyStatement';
-import { downloadAsJpg } from '../utils/exportToJpg';
+import { downloadAsJpg, exportToJpg } from '../utils/exportToJpg';
 
 interface ReportsPageProps {
   invoices: Invoice[];
@@ -80,5 +80,5 @@ export const Reports: React.FC<ReportsPageProps> = ({
   );
 };
 
-export { downloadAsJpg };
+export { downloadAsJpg, exportToJpg };
 export default Reports;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { CustomerKhataModal } from './CustomerKhataModal';
 import { Customer, Invoice, BusinessInfo } from '../types/invoice';
-import { downloadAsJpg } from '../utils/exportToJpg';
+import { downloadAsJpg, exportToJpg } from '../utils/exportToJpg';
 
 export interface CustomerLedgerProps {
   customer: Customer;
@@ -29,5 +29,5 @@ export const CustomerLedger: React.FC<CustomerLedgerProps> = (props) => {
   );
 };
 
-export { downloadAsJpg };
+export { downloadAsJpg, exportToJpg };
 export default CustomerLedger;

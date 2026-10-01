@@ -27,13 +27,15 @@ function createInvoicePrintElement(invoice: Invoice, businessInfo: BusinessInfo)
   container.id = 'invoice-render-area';
   container.style.position = 'fixed';
   container.style.left = '-9999px';
-  container.style.top = '-9999px';
-  container.style.width = '794px'; // Standard A4 pixel width at 96 DPI
+  container.style.top = '0';
+  container.style.width = '800px';
+  container.style.zIndex = '-9999';
   container.style.backgroundColor = '#ffffff';
+  container.style.display = 'block';
+  container.style.visibility = 'visible';
   container.style.color = '#000000';
   container.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
   container.style.boxSizing = 'border-box';
-  container.style.zIndex = '-1000';
   container.style.boxShadow = 'none';
   container.style.borderRadius = '0';
   container.style.border = 'none';
@@ -270,12 +272,15 @@ export async function captureInvoiceCanvas(
     element.style.setProperty('background-color', '#ffffff', 'important');
     element.style.setProperty('color', '#000000', 'important');
 
+    // Allow browser frame to finish painting fonts and images
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
     const canvas = await html2canvas(element, {
       scale: 2,
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
-      logging: false,
+      logging: true,
       onclone: (clonedDoc) => {
         const win = clonedDoc.defaultView || window;
         // Ensure element is visible and strip/convert unsupported oklch color functions

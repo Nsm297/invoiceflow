@@ -1,7 +1,7 @@
 import React from 'react';
 import { MonthlyStatement } from './MonthlyStatement';
 import { Invoice, Customer, BusinessInfo } from '../types/invoice';
-import { downloadAsJpg } from '../utils/exportToJpg';
+import { downloadAsJpg, exportToJpg } from '../utils/exportToJpg';
 
 export interface MonthlyReportProps {
   invoices: Invoice[];
@@ -33,5 +33,5 @@ export const MonthlyReport: React.FC<MonthlyReportProps> = ({
   );
 };
 
-export { downloadAsJpg };
+export { downloadAsJpg, exportToJpg };
 export default MonthlyReport;
