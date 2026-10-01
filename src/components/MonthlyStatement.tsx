@@ -254,13 +254,13 @@ export const MonthlyStatement: React.FC<MonthlyStatementProps> = ({
       <div
         id="monthly-report-area"
         data-template={selectedTemplate}
-        className={`space-y-6 bg-white p-4 sm:p-6 rounded-2xl border ${
+        className={`export-card-wrapper space-y-6 bg-white p-4 sm:p-6 rounded-2xl border ${
           selectedTemplate === 'classic' ? 'border-2 border-blue-900 font-sans' :
           selectedTemplate === 'elegant' ? 'border-2 border-emerald-900 font-sans' :
           selectedTemplate === 'compact' ? 'border-2 border-dashed border-slate-400 font-mono text-xs' :
           'border border-slate-200 font-sans'
         }`}
-        style={{ backgroundColor: '#ffffff', color: '#111827' }}
+        style={{ backgroundColor: '#ffffff', minHeight: '300px', color: '#111827' }}
       >
         {/* Report Official Header Section */}
         {selectedTemplate === 'elegant' ? (

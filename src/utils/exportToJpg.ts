@@ -2,27 +2,44 @@ import html2canvas from 'html2canvas';
 
 /**
  * Universal JPG Export Utility for InvoiceFlow
- * Exports specified DOM element ID as high-resolution crisp JPG image.
- * 
- * Includes optimizations for mobile canvas memory limits, CSS sanitization,
- * and reliable frame painting.
+ * Supports:
+ * - History View (#history-report-area)
+ * - View Khata (#khata-report-area & #ledger-render-area)
+ * - Monthly View (#monthly-report-area)
+ * - Yearly View (#yearly-report-area)
+ * - Invoice Print (#invoice-render-area)
+ * - Fallback query selector (.export-card-wrapper)
  */
 export const downloadAsJpg = async (elementId: string, fileName: string): Promise<boolean> => {
-  const element = document.getElementById(elementId);
-  if (!element) {
-    console.error(`Element with id ${elementId} not found.`);
-    alert('Report template element not found. Please try again.');
+  // 1. Look up primary element ID with smart fallbacks
+  let target = document.getElementById(elementId);
+  
+  if (!target && elementId === 'khata-report-area') {
+    target = document.getElementById('ledger-render-area');
+  } else if (!target && elementId === 'ledger-render-area') {
+    target = document.getElementById('khata-report-area');
+  }
+
+  if (!target) {
+    target = document.querySelector('.export-card-wrapper') as HTMLElement;
+  }
+
+  if (!target) {
+    console.error(`[downloadAsJpg] Report element (${elementId}) not found in document.`);
+    alert(`Report element (${elementId}) not ready. Please try again.`);
     return false;
   }
 
   try {
-    // 1. Allow browser frame to finish painting fonts & images
+    // 2. Allow browser frame to finish painting fonts & layout elements
     await new Promise((resolve) => setTimeout(resolve, 350));
 
-    // 2. Dynamic scale calculation to prevent mobile browser canvas memory crashes
+    // 3. Dynamic scale to avoid mobile canvas memory limits (1.5x mobile, 2x desktop)
     const scale = typeof window !== 'undefined' && window.innerWidth < 768 ? 1.5 : 2;
 
-    const canvas = await html2canvas(element, {
+    const actualId = target.id || elementId;
+
+    const canvas = await html2canvas(target, {
       scale,
       useCORS: true,
       allowTaint: true,
@@ -30,13 +47,24 @@ export const downloadAsJpg = async (elementId: string, fileName: string): Promis
       backgroundColor: '#ffffff',
       logging: false,
       onclone: (clonedDoc) => {
-        const clonedEl = clonedDoc.getElementById(elementId);
+        const clonedEl =
+          clonedDoc.getElementById(actualId) ||
+          clonedDoc.getElementById(elementId) ||
+          clonedDoc.getElementById('khata-report-area') ||
+          clonedDoc.getElementById('ledger-render-area') ||
+          clonedDoc.getElementById('monthly-report-area') ||
+          clonedDoc.getElementById('yearly-report-area') ||
+          clonedDoc.getElementById('history-report-area') ||
+          (clonedDoc.querySelector('.export-card-wrapper') as HTMLElement);
+
         if (clonedEl) {
           clonedEl.style.display = 'block';
           clonedEl.style.visibility = 'visible';
           clonedEl.style.backgroundColor = '#ffffff';
+          clonedEl.style.color = '#111827';
+          clonedEl.style.minHeight = '300px';
 
-          // Fallback fonts & styles to prevent CSS parsing locks / oklch issues
+          // Sanitize child node styles to avoid CSS parsing locks or oklch errors
           const nodes = clonedEl.querySelectorAll('*');
           nodes.forEach((node: any) => {
             if (node.style) {

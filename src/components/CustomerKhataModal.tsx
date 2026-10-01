@@ -89,7 +89,7 @@ export const CustomerKhataModal: React.FC<CustomerKhataModalProps> = ({
     try {
       setIsExportingJpg(true);
       const cleanName = (customer.name || 'Customer').trim().replace(/\s+/g, '_');
-      await downloadAsJpg('ledger-render-area', `Customer_Ledger_${cleanName}`);
+      await downloadAsJpg('khata-report-area', `Customer_Ledger_${cleanName}`);
     } catch (err) {
       console.error('Failed to export Customer Ledger to JPG:', err);
     } finally {
@@ -246,15 +246,15 @@ _Generated via ${storeTitle} POS System_`;
           />
         </div>
 
-        {/* Scrollable Main Area containing ledger-render-area */}
+        {/* Scrollable Main Area containing khata-report-area */}
         <div className="overflow-y-auto flex-1 bg-white print:overflow-visible">
           <div
-            id="ledger-render-area"
+            id="khata-report-area"
             data-template={selectedTemplate}
-            className={`p-4 sm:p-6 space-y-6 bg-white text-slate-900 border-none print:p-6 ${
+            className={`export-card-wrapper p-4 sm:p-6 space-y-6 bg-white text-slate-900 border-none print:p-6 ${
               selectedTemplate === 'compact' ? 'font-mono text-xs' : 'font-sans'
             }`}
-            style={{ backgroundColor: '#ffffff', color: '#111827' }}
+            style={{ backgroundColor: '#ffffff', minHeight: '300px', color: '#111827' }}
           >
             {/* Statement Header Section by Template */}
             {selectedTemplate === 'elegant' ? (

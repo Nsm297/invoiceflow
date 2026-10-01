@@ -35,7 +35,7 @@ export const InvoiceHistory: React.FC<InvoiceHistoryProps> = ({
   });
 
   return (
-    <div className="space-y-6">
+    <div id="history-report-area" className="space-y-6 export-card-wrapper">
       {/* Header bar */}
       <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
