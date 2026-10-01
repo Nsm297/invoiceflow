@@ -1,6 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { Invoice, Customer, BusinessInfo } from '../types/invoice';
 import { formatRupees } from '../utils/formatters';
+import { downloadAsJpg } from '../utils/exportToJpg';
+import { TemplateSelector } from './TemplateSelector';
+import { useJpgTemplate } from '../hooks/useJpgTemplate';
 
 interface YearlyStatementProps {
   invoices: Invoice[];
@@ -21,6 +24,8 @@ export const YearlyStatement: React.FC<YearlyStatementProps> = ({
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('all');
+  const [isExportingJpg, setIsExportingJpg] = useState<boolean>(false);
+  const [selectedTemplate, setSelectedTemplate] = useJpgTemplate();
 
   // Dynamically generate a broad year range (e.g., from 2020 to 2030) merged with any existing invoice years
   const availableYears = useMemo(() => {
@@ -96,7 +101,6 @@ export const YearlyStatement: React.FC<YearlyStatementProps> = ({
   }, [filteredYearInvoices]);
 
   // 3. Total Remaining Balance = Strictly (Total Period Sales - Total Period Payment Received)
-  // This avoids double counting customer carried-forward balances.
   const totalYearlyRemaining = totalYearlySales - totalYearlyCashReceived;
 
   // 4. Total Invoices Count
@@ -127,7 +131,6 @@ export const YearlyStatement: React.FC<YearlyStatementProps> = ({
     });
 
     months.forEach((m) => {
-      // Remaining Balance strictly = Period Sales minus Period Payments
       m.remainingBalance = m.sales - m.cashReceived;
     });
 
@@ -138,10 +141,22 @@ export const YearlyStatement: React.FC<YearlyStatementProps> = ({
     window.print();
   };
 
+  const handleExportJpg = async () => {
+    try {
+      setIsExportingJpg(true);
+      const cleanCustomerSuffix = selectedCustomerObj ? `_${selectedCustomerObj.name.trim().replace(/\s+/g, '_')}` : '';
+      await downloadAsJpg('yearly-report-area', `Yearly_Report_${selectedYear}${cleanCustomerSuffix}`);
+    } catch (err) {
+      console.error('Failed to export Yearly Report to JPG:', err);
+    } finally {
+      setIsExportingJpg(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Controls & Filter Bar */}
-      <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-xs">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-base font-bold text-slate-900">
@@ -168,7 +183,7 @@ export const YearlyStatement: React.FC<YearlyStatementProps> = ({
           </p>
         </div>
 
-        {/* Filter Dropdowns & Print Actions */}
+        {/* Filter Dropdowns & Export/Print Actions */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Customer Selection Filter */}
           <div className="flex items-center gap-1.5 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200 min-h-[38px]">
@@ -204,220 +219,440 @@ export const YearlyStatement: React.FC<YearlyStatementProps> = ({
             </select>
           </div>
 
+          {/* Export JPG Button */}
+          <button
+            type="button"
+            onClick={handleExportJpg}
+            disabled={isExportingJpg}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg transition-all shadow-xs min-h-[38px] cursor-pointer"
+            title="Export Yearly Report as high-resolution JPG image"
+          >
+            {isExportingJpg ? (
+              <i className="fa-solid fa-spinner fa-spin text-xs"></i>
+            ) : (
+              <i className="fa-solid fa-image text-xs"></i>
+            )}
+            <span>{isExportingJpg ? 'Exporting...' : 'Export JPG'}</span>
+          </button>
+
           {/* Print Annual Statement Button */}
           <button
             type="button"
             onClick={handlePrint}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all shadow-xs min-h-[38px] ${
-              selectedCustomerObj
-                ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                : 'bg-slate-900 hover:bg-slate-800 text-white'
-            }`}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-all shadow-xs min-h-[38px] cursor-pointer"
+            title="Print annual report"
           >
             <i className="fa-solid fa-print text-xs"></i>
-            <span>{selectedCustomerObj ? 'Print Customer Statement' : 'Print Annual Report'}</span>
+            <span>Print</span>
           </button>
         </div>
       </div>
 
-      {/* 4 KPI Cards: Responsive font sizes to prevent overflow */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        
-        {/* 1. Total Yearly Sales / Total Bill */}
-        <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200 space-y-1 flex flex-col justify-between shadow-xs">
-          <div className="text-[10px] sm:text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between gap-1">
-            <span className="truncate">{selectedCustomerObj ? 'Client Sales' : 'Yearly Sales'}</span>
-            <span className="text-[9px] sm:text-[10px] text-emerald-800 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 shrink-0">
-              Total Bill
-            </span>
-          </div>
-          <div className="text-base sm:text-lg lg:text-2xl font-black font-mono text-emerald-800 tabular-nums truncate tracking-tight py-0.5" title={formatRupees(totalYearlySales)}>
-            {formatRupees(totalYearlySales)}
-          </div>
-          <div className="text-[10px] sm:text-[11px] text-slate-500 truncate">
-            {selectedCustomerObj ? `${selectedCustomerObj.name.slice(0, 14)}...` : `All bills in ${selectedYear}`}
-          </div>
+      {/* Template Selector Bar */}
+      <div className="bg-white p-3 sm:px-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-slate-800">Export Theme:</span>
+          <span className="text-[11px] text-slate-500">Pick theme before exporting to JPG</span>
         </div>
-
-        {/* 2. Total Payment Received */}
-        <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200 space-y-1 flex flex-col justify-between shadow-xs">
-          <div className="text-[10px] sm:text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between gap-1">
-            <span className="truncate">Payment Received</span>
-            <span className="text-[9px] sm:text-[10px] text-sky-800 font-semibold bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200 shrink-0">
-              Collected
-            </span>
-          </div>
-          <div className="text-base sm:text-lg lg:text-2xl font-black font-mono text-sky-800 tabular-nums truncate tracking-tight py-0.5" title={formatRupees(totalYearlyCashReceived)}>
-            {formatRupees(totalYearlyCashReceived)}
-          </div>
-          <div className="text-[10px] sm:text-[11px] text-slate-500 truncate">
-            Paid in year {selectedYear}
-          </div>
-        </div>
-
-        {/* 3. Total Remaining Balance (Baqaya) */}
-        <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200 space-y-1 flex flex-col justify-between shadow-xs">
-          <div className="text-[10px] sm:text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between gap-1">
-            <span className="truncate">Remaining</span>
-            <span className={`text-[9px] sm:text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${
-              totalYearlyRemaining > 0
-                ? 'text-amber-800 bg-amber-50 border-amber-200'
-                : 'text-emerald-800 bg-emerald-50 border-emerald-200'
-            }`}>
-              Baqaya
-            </span>
-          </div>
-          <div className={`text-base sm:text-lg lg:text-2xl font-black font-mono tabular-nums truncate tracking-tight py-0.5 ${
-            totalYearlyRemaining > 0 ? 'text-amber-700' : 'text-emerald-700'
-          }`} title={formatRupees(totalYearlyRemaining)}>
-            {formatRupees(totalYearlyRemaining)}
-          </div>
-          <div className="text-[10px] sm:text-[11px] text-slate-500 truncate">
-            Sales minus Payments
-          </div>
-        </div>
-
-        {/* 4. Total Invoices Count */}
-        <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200 space-y-1 flex flex-col justify-between shadow-xs">
-          <div className="text-[10px] sm:text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between gap-1">
-            <span className="truncate">Invoices</span>
-            <span className="text-[9px] sm:text-[10px] text-slate-600 font-semibold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
-              Year {selectedYear}
-            </span>
-          </div>
-          <div className="text-base sm:text-lg lg:text-2xl font-black font-mono text-slate-900 tabular-nums py-0.5">
-            {totalInvoicesCount}
-          </div>
-          <div className="text-[10px] sm:text-[11px] text-slate-500 truncate">
-            {selectedCustomerObj ? 'Invoices for client' : `Invoices created in ${selectedYear}`}
-          </div>
-        </div>
-
+        <TemplateSelector
+          selectedTemplate={selectedTemplate}
+          onSelectTemplate={setSelectedTemplate}
+          variant="pills"
+        />
       </div>
 
-      {/* 12-Month Summary Table with Clean Zero-Value Formatting */}
-      <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-          <div className="flex items-center gap-2">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              {selectedCustomerObj ? `${selectedCustomerObj.name} — Annual Statement` : `${selectedYear} Month-by-Month Statement`}
-            </h3>
+      {/* Target Render Area for Yearly Report JPG Export */}
+      <div
+        id="yearly-report-area"
+        data-template={selectedTemplate}
+        className={`space-y-6 bg-white p-4 sm:p-6 rounded-2xl border ${
+          selectedTemplate === 'classic' ? 'border-2 border-blue-900 font-sans' :
+          selectedTemplate === 'elegant' ? 'border-2 border-emerald-900 font-sans' :
+          selectedTemplate === 'compact' ? 'border-2 border-dashed border-slate-400 font-mono text-xs' :
+          'border border-slate-200 font-sans'
+        }`}
+        style={{ backgroundColor: '#ffffff', color: '#111827' }}
+      >
+        {/* Report Official Header Section */}
+        {selectedTemplate === 'elegant' ? (
+          <div className="bg-emerald-950 text-white -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 p-6 sm:p-7 rounded-t-xl mb-4 border-b-4 border-emerald-600">
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+              <div>
+                <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-800 text-emerald-100 mb-2">
+                  Annual Financial Statement
+                </span>
+                <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  {businessInfo?.name || 'Store Financial Statement'}
+                </h1>
+                {businessInfo?.tagline && (
+                  <p className="text-xs text-emerald-200 font-medium italic mt-0.5">{businessInfo.tagline}</p>
+                )}
+                <div className="text-xs text-emerald-100 mt-2 space-y-0.5">
+                  {businessInfo?.address && <p>📍 {businessInfo.address}</p>}
+                  {businessInfo?.phone && <p>📞 Phone: {businessInfo.phone}</p>}
+                </div>
+              </div>
+
+              <div className="text-left sm:text-right">
+                <div className="inline-block bg-emerald-800 text-white font-bold text-xs px-3 py-1 rounded tracking-wider uppercase mb-1">
+                  Annual Performance
+                </div>
+                <p className="text-xs font-bold text-white">
+                  Fiscal Year: {selectedYear}
+                </p>
+                <p className="text-[11px] text-emerald-200">
+                  Generated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-emerald-800 grid grid-cols-2 gap-4 text-xs bg-emerald-900/60 p-3 rounded-lg">
+              <div>
+                <span className="text-emerald-300 font-bold uppercase text-[10px] block">Filter Scope:</span>
+                <p className="font-bold text-sm text-white">
+                  {selectedCustomerObj ? selectedCustomerObj.name : 'All Store Customers'}
+                </p>
+              </div>
+              <div>
+                <span className="text-emerald-300 font-bold uppercase text-[10px] block">Total Invoices:</span>
+                <p className="font-mono font-bold text-sm text-white">{totalInvoicesCount} Invoices</p>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {selectedCustomerObj && (
-              <button
-                type="button"
-                onClick={() => setSelectedCustomerId('all')}
-                className="text-[11px] font-semibold text-slate-500 hover:text-slate-900 underline"
-              >
-                Clear Customer Filter
-              </button>
-            )}
-            <span className="text-[11px] font-mono text-slate-500">12 Months Summary</span>
+        ) : selectedTemplate === 'classic' ? (
+          <div className="p-4 sm:p-5 border-b-2 border-blue-900 bg-white rounded-xl">
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-black text-blue-950 uppercase tracking-tight">
+                  {businessInfo?.name || 'Store Financial Statement'}
+                </h1>
+                {businessInfo?.tagline && (
+                  <p className="text-xs text-blue-700 font-semibold italic">{businessInfo.tagline}</p>
+                )}
+                <div className="text-xs text-slate-700 mt-1 space-y-0.5">
+                  {businessInfo?.address && <p>{businessInfo.address}</p>}
+                  {businessInfo?.phone && <p className="font-medium">Phone: {businessInfo.phone}</p>}
+                </div>
+              </div>
+
+              <div className="text-left sm:text-right">
+                <div className="inline-block bg-blue-900 text-white font-bold text-xs px-3 py-1 rounded tracking-wider uppercase mb-1">
+                  Annual Financial Report
+                </div>
+                <p className="text-xs font-bold text-slate-900">
+                  Fiscal Year: {selectedYear}
+                </p>
+                <p className="text-[11px] text-slate-600">
+                  Generated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-blue-200 grid grid-cols-2 gap-4 text-xs bg-blue-50/70 p-3 rounded-lg">
+              <div>
+                <span className="text-blue-900 font-bold uppercase text-[10px] block">Filter Scope:</span>
+                <p className="font-bold text-sm text-slate-900">
+                  {selectedCustomerObj ? selectedCustomerObj.name : 'All Store Customers'}
+                </p>
+              </div>
+              <div>
+                <span className="text-blue-900 font-bold uppercase text-[10px] block">Total Invoices:</span>
+                <p className="font-mono font-bold text-sm text-slate-900">{totalInvoicesCount} Invoices</p>
+              </div>
+            </div>
+          </div>
+        ) : selectedTemplate === 'compact' ? (
+          <div className="p-3 border-b-2 border-dashed border-slate-400 text-center">
+            <h1 className="text-lg font-black uppercase text-slate-900">
+              {businessInfo?.name || 'Annual Statement'}
+            </h1>
+            <p className="text-[11px] text-slate-700">
+              Year: {selectedYear} · {selectedCustomerObj ? selectedCustomerObj.name : 'All Customers'}
+            </p>
+            <div className="mt-2 pt-2 border-t border-dashed border-slate-300 flex justify-between text-xs">
+              <span>TOTAL INVOICES: {totalInvoicesCount}</span>
+              <span>{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+            </div>
+          </div>
+        ) : (
+          /* Modern Minimal */
+          <div className="p-4 sm:p-5 border-b border-slate-200 bg-white rounded-xl">
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+              <div>
+                <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                  {businessInfo?.name || 'Store Financial Statement'}
+                </h1>
+                {businessInfo?.tagline && (
+                  <p className="text-xs text-slate-500 font-medium">{businessInfo.tagline}</p>
+                )}
+                <div className="text-xs text-slate-600 mt-1 space-y-0.5">
+                  {businessInfo?.address && <p>{businessInfo.address}</p>}
+                  {businessInfo?.phone && <p className="font-medium">Phone: {businessInfo.phone}</p>}
+                </div>
+              </div>
+
+              <div className="text-left sm:text-right">
+                <div className="text-sm font-bold uppercase tracking-wider text-slate-700">
+                  Annual Statement
+                </div>
+                <p className="text-xs font-bold text-slate-900">
+                  Year {selectedYear}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-4 text-xs bg-slate-50 p-3 rounded-lg">
+              <div>
+                <span className="text-slate-400 font-bold uppercase text-[10px] block">Filter Scope:</span>
+                <p className="font-bold text-sm text-slate-900">
+                  {selectedCustomerObj ? selectedCustomerObj.name : 'All Store Customers'}
+                </p>
+              </div>
+              <div>
+                <span className="text-slate-400 font-bold uppercase text-[10px] block">Total Invoices:</span>
+                <p className="font-mono font-bold text-sm text-slate-900">{totalInvoicesCount} Invoices</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 4 KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {/* 1. Total Yearly Sales / Total Bill */}
+          <div className={`p-3.5 sm:p-5 rounded-xl space-y-1 flex flex-col justify-between border ${
+            selectedTemplate === 'classic' ? 'bg-blue-50/70 border-blue-300' :
+            selectedTemplate === 'elegant' ? 'bg-emerald-50/70 border-emerald-300' :
+            selectedTemplate === 'compact' ? 'bg-slate-50 border-dashed border-slate-400 p-2.5' :
+            'bg-slate-50 border-slate-200'
+          }`}>
+            <div className="text-[10px] sm:text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center justify-between gap-1">
+              <span className="truncate">{selectedCustomerObj ? 'Client Sales' : 'Yearly Sales'}</span>
+              <span className="text-[9px] sm:text-[10px] text-emerald-900 font-bold bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300 shrink-0">
+                Total Bill
+              </span>
+            </div>
+            <div className="text-base sm:text-lg lg:text-2xl font-black font-mono text-emerald-900 tabular-nums truncate tracking-tight py-0.5" title={formatRupees(totalYearlySales)}>
+              {formatRupees(totalYearlySales)}
+            </div>
+            <div className="text-[10px] sm:text-[11px] text-slate-600 font-medium truncate">
+              {selectedCustomerObj ? `${selectedCustomerObj.name.slice(0, 14)}...` : `All bills in ${selectedYear}`}
+            </div>
+          </div>
+
+          {/* 2. Total Payment Received */}
+          <div className={`p-3.5 sm:p-5 rounded-xl space-y-1 flex flex-col justify-between border ${
+            selectedTemplate === 'classic' ? 'bg-blue-50/70 border-blue-300' :
+            selectedTemplate === 'elegant' ? 'bg-emerald-50/70 border-emerald-300' :
+            selectedTemplate === 'compact' ? 'bg-slate-50 border-dashed border-slate-400 p-2.5' :
+            'bg-slate-50 border-slate-200'
+          }`}>
+            <div className="text-[10px] sm:text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center justify-between gap-1">
+              <span className="truncate">Payment Received</span>
+              <span className="text-[9px] sm:text-[10px] text-sky-900 font-bold bg-sky-100 px-1.5 py-0.5 rounded border border-sky-300 shrink-0">
+                Collected
+              </span>
+            </div>
+            <div className="text-base sm:text-lg lg:text-2xl font-black font-mono text-sky-900 tabular-nums truncate tracking-tight py-0.5" title={formatRupees(totalYearlyCashReceived)}>
+              {formatRupees(totalYearlyCashReceived)}
+            </div>
+            <div className="text-[10px] sm:text-[11px] text-slate-600 font-medium truncate">
+              Paid in year {selectedYear}
+            </div>
+          </div>
+
+          {/* 3. Total Remaining Balance (Baqaya) */}
+          <div className={`p-3.5 sm:p-5 rounded-xl space-y-1 flex flex-col justify-between border ${
+            selectedTemplate === 'compact' ? 'bg-slate-50 border-dashed border-slate-400 p-2.5' :
+            'bg-slate-50 border-slate-200'
+          }`}>
+            <div className="text-[10px] sm:text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center justify-between gap-1">
+              <span className="truncate">Remaining</span>
+              <span className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${
+                totalYearlyRemaining > 0
+                  ? 'text-amber-950 bg-amber-100 border-amber-300'
+                  : 'text-emerald-950 bg-emerald-100 border-emerald-300'
+              }`}>
+                Baqaya
+              </span>
+            </div>
+            <div className={`text-base sm:text-lg lg:text-2xl font-black font-mono tabular-nums truncate tracking-tight py-0.5 ${
+              totalYearlyRemaining > 0 ? 'text-amber-900' : 'text-emerald-900'
+            }`} title={formatRupees(totalYearlyRemaining)}>
+              {formatRupees(totalYearlyRemaining)}
+            </div>
+            <div className="text-[10px] sm:text-[11px] text-slate-600 font-medium truncate">
+              Sales minus Payments
+            </div>
+          </div>
+
+          {/* 4. Total Invoices Count */}
+          <div className={`p-3.5 sm:p-5 rounded-xl space-y-1 flex flex-col justify-between border ${
+            selectedTemplate === 'compact' ? 'bg-slate-50 border-dashed border-slate-400 p-2.5' :
+            'bg-slate-50 border-slate-200'
+          }`}>
+            <div className="text-[10px] sm:text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center justify-between gap-1">
+              <span className="truncate">Invoices</span>
+              <span className="text-[9px] sm:text-[10px] text-slate-800 font-bold bg-slate-200 px-1.5 py-0.5 rounded border border-slate-300 shrink-0">
+                Year {selectedYear}
+              </span>
+            </div>
+            <div className="text-base sm:text-lg lg:text-2xl font-black font-mono text-slate-900 tabular-nums py-0.5">
+              {totalInvoicesCount}
+            </div>
+            <div className="text-[10px] sm:text-[11px] text-slate-600 font-medium truncate">
+              {selectedCustomerObj ? 'Invoices for client' : `Invoices created in ${selectedYear}`}
+            </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wider text-slate-700">
-                <th className="py-2.5 px-3 sm:px-4 font-semibold">Month</th>
-                <th className="py-2.5 px-3 sm:px-4 font-semibold text-center w-20">Invoices</th>
-                <th className="py-2.5 px-3 sm:px-4 font-bold text-emerald-800 text-right bg-emerald-50/50">
-                  Total Sales / Total Bill
-                </th>
-                <th className="py-2.5 px-3 sm:px-4 font-bold text-sky-800 text-right bg-sky-50/50">
-                  Total Payment Received
-                </th>
-                <th className="py-2.5 px-3 sm:px-4 font-bold text-amber-800 text-right bg-amber-50/50">
-                  Remaining Balance (Baqaya)
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {monthlyBreakdown.map((m) => {
-                const isZero = m.count === 0 && m.sales === 0 && m.cashReceived === 0;
+        {/* 12-Month Summary Table */}
+        <div className={`bg-white p-4 sm:p-5 rounded-xl space-y-3 ${
+          selectedTemplate === 'compact' ? 'border border-dashed border-slate-400' : 'border border-slate-300'
+        }`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                {selectedCustomerObj ? `${selectedCustomerObj.name} — Annual Statement` : `${selectedYear} Month-by-Month Statement`}
+              </h3>
+            </div>
+            <div className="flex items-center gap-2">
+              {selectedCustomerObj && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCustomerId('all')}
+                  className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 underline cursor-pointer"
+                >
+                  Clear Customer Filter
+                </button>
+              )}
+              <span className="text-[11px] font-mono font-bold text-slate-700">12 Months Summary</span>
+            </div>
+          </div>
 
-                return (
-                  <tr
-                    key={m.index}
-                    className={`transition-colors ${
-                      isZero ? 'hover:bg-slate-50/40 text-slate-400' : 'hover:bg-slate-50/80'
-                    }`}
-                  >
-                    <td
-                      className={`py-2.5 sm:py-3 px-3 sm:px-4 ${
-                        isZero ? 'font-normal text-slate-400' : 'font-semibold text-slate-800'
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className={`uppercase tracking-wider font-bold ${
+                  selectedTemplate === 'elegant' ? 'bg-emerald-900 text-white text-[11px]' :
+                  selectedTemplate === 'classic' ? 'bg-blue-900 text-white text-[11px]' :
+                  selectedTemplate === 'compact' ? 'border-b border-dashed border-slate-600 text-slate-900 text-[10px]' :
+                  'border-b-2 border-slate-300 bg-slate-100 text-[11px] text-slate-900'
+                }`}>
+                  <th className="py-2.5 px-3 sm:px-4 font-bold">Month</th>
+                  <th className="py-2.5 px-3 sm:px-4 font-bold text-center w-20">Invoices</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-right">
+                    Total Sales / Total Bill
+                  </th>
+                  <th className="py-2.5 px-3 sm:px-4 text-right">
+                    Total Payment Received
+                  </th>
+                  <th className="py-2.5 px-3 sm:px-4 text-right">
+                    Remaining Balance (Baqaya)
+                  </th>
+                </tr>
+              </thead>
+              <tbody className={`divide-y ${selectedTemplate === 'compact' ? 'divide-dashed divide-slate-300 font-mono' : 'divide-slate-200'}`}>
+                {monthlyBreakdown.map((m) => {
+                  const isZero = m.count === 0 && m.sales === 0 && m.cashReceived === 0;
+
+                  return (
+                    <tr
+                      key={m.index}
+                      className={`transition-colors ${
+                        isZero ? 'hover:bg-slate-50/40 text-slate-500' : 'hover:bg-slate-50'
                       }`}
                     >
-                      {m.name}
-                    </td>
+                      <td
+                        className={`py-2.5 sm:py-3 px-3 sm:px-4 ${
+                          isZero ? 'font-normal text-slate-500' : 'font-bold text-slate-900'
+                        }`}
+                      >
+                        {m.name}
+                      </td>
 
-                    <td
-                      className={`py-2.5 sm:py-3 px-3 sm:px-4 text-center font-mono tabular-nums ${
-                        isZero ? 'text-slate-300' : 'text-slate-700 font-semibold'
-                      }`}
-                    >
-                      {isZero ? '0' : m.count}
-                    </td>
+                      <td
+                        className={`py-2.5 sm:py-3 px-3 sm:px-4 text-center font-mono tabular-nums ${
+                          isZero ? 'text-slate-400' : 'text-slate-900 font-bold'
+                        }`}
+                      >
+                        {isZero ? '0' : m.count}
+                      </td>
 
-                    <td
-                      className={`py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono tabular-nums text-xs sm:text-sm ${
-                        isZero
-                          ? 'text-slate-300 font-normal'
-                          : 'font-bold text-emerald-800 bg-emerald-50/30'
-                      }`}
-                    >
-                      {formatRupees(m.sales)}
-                    </td>
+                      <td
+                        className={`py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono tabular-nums text-xs sm:text-sm ${
+                          isZero
+                            ? 'text-slate-400 font-normal'
+                            : 'font-bold text-emerald-900 bg-emerald-50/40'
+                        }`}
+                      >
+                        {formatRupees(m.sales)}
+                      </td>
 
-                    <td
-                      className={`py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono tabular-nums text-xs sm:text-sm ${
-                        isZero
-                          ? 'text-slate-300 font-normal'
-                          : 'font-bold text-sky-800 bg-sky-50/30'
-                      }`}
-                    >
-                      {formatRupees(m.cashReceived)}
-                    </td>
+                      <td
+                        className={`py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono tabular-nums text-xs sm:text-sm ${
+                          isZero
+                            ? 'text-slate-400 font-normal'
+                            : 'font-bold text-sky-900 bg-sky-50/40'
+                        }`}
+                      >
+                        {formatRupees(m.cashReceived)}
+                      </td>
 
-                    <td
-                      className={`py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono tabular-nums text-xs sm:text-sm ${
-                        isZero
-                          ? 'text-slate-300 font-normal'
-                          : m.remainingBalance > 0
-                          ? 'font-bold text-amber-800 bg-amber-50/30'
-                          : 'font-bold text-emerald-700 bg-emerald-50/20'
-                      }`}
-                    >
-                      {formatRupees(m.remainingBalance)}
-                    </td>
-                  </tr>
-                );
-              })}
+                      <td
+                        className={`py-2.5 sm:py-3 px-3 sm:px-4 text-right font-mono tabular-nums text-xs sm:text-sm ${
+                          isZero
+                            ? 'text-slate-400 font-normal'
+                            : m.remainingBalance > 0
+                            ? 'font-bold text-amber-900 bg-amber-50/40'
+                            : 'font-bold text-emerald-800 bg-emerald-50/30'
+                        }`}
+                      >
+                        {formatRupees(m.remainingBalance)}
+                      </td>
+                    </tr>
+                  );
+                })}
 
-              {/* Annual Totals Footer Row */}
-              <tr className="border-t-2 border-slate-900 bg-slate-50 font-bold">
-                <td className="py-3 px-3 sm:px-4 text-slate-900 text-xs sm:text-sm uppercase">
-                  Total {selectedCustomerObj ? selectedCustomerObj.name : selectedYear}
-                </td>
-                <td className="py-3 px-3 sm:px-4 text-center font-mono tabular-nums text-slate-900 text-xs sm:text-sm">
-                  {totalInvoicesCount}
-                </td>
-                <td className="py-3 px-3 sm:px-4 text-right font-mono tabular-nums text-emerald-800 text-xs sm:text-base bg-emerald-100/50">
-                  {formatRupees(totalYearlySales)}
-                </td>
-                <td className="py-3 px-3 sm:px-4 text-right font-mono tabular-nums text-sky-800 text-xs sm:text-base bg-sky-100/50">
-                  {formatRupees(totalYearlyCashReceived)}
-                </td>
-                <td className="py-3 px-3 sm:px-4 text-right font-mono tabular-nums text-amber-800 text-xs sm:text-base bg-amber-100/50">
-                  {formatRupees(totalYearlyRemaining)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                {/* Annual Totals Footer Row */}
+                <tr className="border-t-2 border-slate-900 bg-slate-100 font-bold">
+                  <td className="py-3 px-3 sm:px-4 text-slate-950 text-xs sm:text-sm uppercase">
+                    Total {selectedCustomerObj ? selectedCustomerObj.name : selectedYear}
+                  </td>
+                  <td className="py-3 px-3 sm:px-4 text-center font-mono tabular-nums text-slate-950 text-xs sm:text-sm">
+                    {totalInvoicesCount}
+                  </td>
+                  <td className="py-3 px-3 sm:px-4 text-right font-mono tabular-nums text-emerald-950 text-xs sm:text-base bg-emerald-200/60 font-black">
+                    {formatRupees(totalYearlySales)}
+                  </td>
+                  <td className="py-3 px-3 sm:px-4 text-right font-mono tabular-nums text-sky-950 text-xs sm:text-base bg-sky-200/60 font-black">
+                    {formatRupees(totalYearlyCashReceived)}
+                  </td>
+                  <td className="py-3 px-3 sm:px-4 text-right font-mono tabular-nums text-amber-950 text-xs sm:text-base bg-amber-200/60 font-black">
+                    {formatRupees(totalYearlyRemaining)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Statement Signatures Block */}
+        <div className="flex justify-between items-end pt-6 text-xs text-slate-700">
+          <div className="text-center w-48">
+            <div className="border-b-2 border-slate-400 pb-1 font-mono font-bold text-slate-900">
+              Accountant / Manager
+            </div>
+            <p className="mt-1 text-[10px] text-slate-600 font-bold uppercase">Prepared By</p>
+          </div>
+          <div className="text-center w-48">
+            <div className="border-b-2 border-slate-400 pb-1 font-mono font-bold text-slate-900">
+              {businessInfo?.name || 'Authorized Sign'}
+            </div>
+            <p className="mt-1 text-[10px] text-slate-600 font-bold uppercase">Authorized Signature</p>
+          </div>
         </div>
       </div>
     </div>
   );
 };
+

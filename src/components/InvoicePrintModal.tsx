@@ -6,6 +6,9 @@ import {
   downloadInvoiceImage,
   shareInvoiceViaWhatsAppImage,
 } from '../utils/pdfGenerator';
+import { TemplateSelector } from './TemplateSelector';
+import { useJpgTemplate } from '../hooks/useJpgTemplate';
+import { JpgTemplateId } from '../types/template';
 
 interface InvoicePrintModalProps {
   invoice: Invoice | null;
@@ -26,6 +29,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isGeneratingJPG, setIsGeneratingJPG] = useState(false);
   const [isSharingWA, setIsSharingWA] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useJpgTemplate();
 
   if (!isOpen || !invoice) return null;
 
@@ -56,7 +60,6 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
       await downloadInvoicePDF(invoice, businessInfo, printElement);
     } catch (err: any) {
       console.error('Failed to generate PDF:', err);
-      // Fallback to browser print
       window.print();
     } finally {
       setIsGeneratingPDF(false);
@@ -104,139 +107,15 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDownloadHTML = () => {
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Invoice - ${invoice.invoiceNumber} - ${invoice.customerName}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #0f172a; background: #fff; padding: 30px; max-width: 800px; margin: 0 auto; line-height: 1.4; }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px; border-bottom: 2px solid #0f172a; margin-bottom: 20px; }
-    .store-name { font-size: 22px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
-    .store-info { font-size: 12px; color: #475569; line-height: 1.4; }
-    .inv-title { font-size: 26px; font-weight: 800; text-align: right; color: #0f172a; letter-spacing: -0.5px; }
-    .inv-meta { font-size: 13px; text-align: right; color: #334155; margin-top: 4px; }
-    .customer-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; margin-bottom: 24px; }
-    .cust-label { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 4px; }
-    .cust-name { font-size: 16px; font-weight: 700; color: #0f172a; }
-    .cust-phone { font-size: 13px; color: #334155; margin-top: 2px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-    th { text-align: left; padding: 10px 12px; font-size: 11px; text-transform: uppercase; color: #334155; background: #f1f5f9; border-bottom: 1px solid #cbd5e1; font-weight: 700; }
-    th.text-right { text-align: right; }
-    td { padding: 12px; font-size: 13px; border-bottom: 1px solid #e2e8f0; color: #1e293b; }
-    td.text-right { text-align: right; font-family: monospace; font-size: 13px; }
-    .totals-wrapper { display: flex; justify-content: flex-end; margin-bottom: 30px; }
-    .totals-card { width: 340px; }
-    .total-line { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; color: #475569; }
-    .total-line span:last-child { font-family: monospace; font-weight: 600; }
-    .total-line.bill { border-top: 1px solid #cbd5e1; margin-top: 6px; padding-top: 8px; font-size: 15px; font-weight: 800; color: #0f172a; }
-    .total-line.paid { color: #0369a1; font-weight: 700; }
-    .total-line.remaining { border-top: 2px solid #0f172a; margin-top: 6px; padding-top: 10px; font-size: 17px; font-weight: 800; color: #047857; }
-    .footer { text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 16px; margin-top: 20px; }
-    @media print { body { padding: 0; } }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div>
-      <div class="store-name">${businessInfo.name}</div>
-      ${businessInfo.tagline ? `<div style="font-size: 11px; color: #047857; font-style: italic; margin-bottom: 4px;">${businessInfo.tagline}</div>` : ''}
-      <div class="store-info">
-        <div>Phone: ${businessInfo.phone}</div>
-        <div>Address: ${businessInfo.address}</div>
-      </div>
-    </div>
-    <div>
-      <div class="inv-title">INVOICE</div>
-      <div class="inv-meta">
-        <div><strong>#${invoice.invoiceNumber}</strong></div>
-        <div>Date: ${formatDate(invoice.invoiceDate)}</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="customer-box">
-    <div class="cust-label">Billed Customer</div>
-    <div class="cust-name">${invoice.customerName}</div>
-    ${invoice.customerPhone ? `<div class="cust-phone">Phone: ${invoice.customerPhone}</div>` : ''}
-  </div>
-
-  <table>
-    <thead>
-      <tr>
-        <th style="width: 50%;">Item Name</th>
-        <th class="text-right" style="width: 15%;">Qty</th>
-        <th class="text-right" style="width: 18%;">Unit Price</th>
-        <th class="text-right" style="width: 17%;">Total (Rs.)</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${invoice.items
-        .map(
-          (it) => `
-        <tr>
-          <td><strong>${it.name}</strong></td>
-          <td class="text-right">${it.quantity}</td>
-          <td class="text-right">${formatRupees(it.unitPrice)}</td>
-          <td class="text-right">${formatRupees(it.amount)}</td>
-        </tr>
-      `
-        )
-        .join('')}
-    </tbody>
-  </table>
-
-  <div class="totals-wrapper">
-    <div class="totals-card">
-      <div class="total-line">
-        <span>Items Subtotal:</span>
-        <span>${formatRupees(invoice.subtotal)}</span>
-      </div>
-      <div class="total-line">
-        <span>Previous Balance:</span>
-        <span style="color: #b45309;">${formatRupees(invoice.previousBalance)}</span>
-      </div>
-      <div class="total-line bill">
-        <span>Total Bill:</span>
-        <span>${formatRupees(totalBill)}</span>
-      </div>
-      <div class="total-line paid">
-        <span>Payment Received:</span>
-        <span>${formatRupees(paymentReceived)}</span>
-      </div>
-      <div class="total-line remaining">
-        <span>Remaining Balance:</span>
-        <span>${formatRupees(remainingBalance)}</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="footer">
-    Thank you for your business! For inquiries, contact ${businessInfo.phone}.
-  </div>
-</body>
-</html>`;
-
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Invoice_${invoice.invoiceNumber}_${invoice.customerName.replace(/\s+/g, '_')}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden my-auto border border-slate-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto">
+      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[94vh] overflow-hidden my-auto border border-slate-200">
         
         {/* Top Control Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-slate-900 text-white shrink-0 no-print">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-3 bg-slate-900 text-white shrink-0 no-print">
           <div className="flex items-center gap-2">
             <span className="text-xs uppercase tracking-wider text-slate-400 font-bold">
-              Invoice Print / PDF
+              Invoice Export & Print
             </span>
             <span className="text-xs text-slate-500">·</span>
             <span className="text-sm font-mono font-bold text-emerald-400">
@@ -244,12 +123,29 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Direct JPG Image Download Button */}
+            <button
+              type="button"
+              onClick={handleDownloadJPG}
+              disabled={isGeneratingJPG}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-75 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              title="Download invoice directly as a high-quality JPG image"
+            >
+              {isGeneratingJPG ? (
+                <i className="fa-solid fa-circle-notch fa-spin text-xs"></i>
+              ) : (
+                <i className="fa-solid fa-image text-xs"></i>
+              )}
+              <span>{isGeneratingJPG ? 'Generating...' : 'Export JPG'}</span>
+            </button>
+
             {/* WhatsApp Share Button */}
             <button
+              type="button"
               onClick={handleShareWhatsApp}
               disabled={isSharingWA}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] disabled:opacity-75 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors active:scale-[0.98]"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] disabled:opacity-75 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
               title="Share invoice image directly on WhatsApp"
             >
               {isSharingWA ? (
@@ -260,26 +156,12 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
               <span>{isSharingWA ? 'Preparing...' : 'WhatsApp'}</span>
             </button>
 
-            {/* Direct JPG Image Download Button */}
-            <button
-              onClick={handleDownloadJPG}
-              disabled={isGeneratingJPG}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-75 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors active:scale-[0.98]"
-              title="Download invoice directly as a high-quality JPG image"
-            >
-              {isGeneratingJPG ? (
-                <i className="fa-solid fa-circle-notch fa-spin text-xs"></i>
-              ) : (
-                <i className="fa-solid fa-image text-xs"></i>
-              )}
-              <span>{isGeneratingJPG ? 'Generating...' : 'Download Image (JPG)'}</span>
-            </button>
-
             {/* Direct PDF Download Button */}
             <button
+              type="button"
               onClick={handleDownloadPDF}
               disabled={isGeneratingPDF}
-              className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-75 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors active:scale-[0.98]"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-75 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
               title="Download single-page A4 PDF file"
             >
               {isGeneratingPDF ? (
@@ -287,33 +169,25 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
               ) : (
                 <i className="fa-solid fa-file-pdf text-xs"></i>
               )}
-              <span>{isGeneratingPDF ? 'Generating...' : 'PDF'}</span>
+              <span>PDF</span>
             </button>
 
             {/* Print Button */}
             <button
+              type="button"
               onClick={handlePrint}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium border border-slate-700 transition-colors"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium border border-slate-700 transition-colors cursor-pointer"
               title="Print document via system print dialog"
             >
               <i className="fa-solid fa-print text-xs"></i>
               <span>Print</span>
             </button>
 
-            {/* Download Standalone HTML Button */}
-            <button
-              onClick={handleDownloadHTML}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium border border-slate-700 transition-colors"
-              title="Download standalone HTML file"
-            >
-              <i className="fa-solid fa-file-arrow-down text-xs"></i>
-              <span>HTML File</span>
-            </button>
-
             {/* Copy Summary Button */}
             <button
+              type="button"
               onClick={handleCopySummary}
-              className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+              className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
               title="Copy text summary"
             >
               <i className={`fa-solid ${copied ? 'fa-check text-emerald-400' : 'fa-copy'} text-xs`}></i>
@@ -321,8 +195,9 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
 
             {/* Close Button */}
             <button
+              type="button"
               onClick={onClose}
-              className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors ml-1"
+              className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors ml-1 cursor-pointer"
               aria-label="Close modal"
             >
               <i className="fa-solid fa-xmark text-sm"></i>
@@ -330,101 +205,202 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
           </div>
         </div>
 
-        {/* Scrollable Printable Document */}
-        <div className="overflow-y-auto p-5 sm:p-10 bg-slate-100 print:bg-white print:p-0">
+        {/* Template Selector Bar */}
+        <div className="px-4 sm:px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-800">JPG Export Template:</span>
+            <span className="text-[11px] text-slate-500">Pick layout style before downloading</span>
+          </div>
+          <TemplateSelector
+            selectedTemplate={selectedTemplate}
+            onSelectTemplate={setSelectedTemplate}
+            variant="pills"
+          />
+        </div>
+
+        {/* Scrollable Printable Document Area */}
+        <div className="overflow-y-auto p-4 sm:p-6 bg-slate-100 print:bg-white print:p-0 flex-1">
           <div
             id="invoice-render-area"
+            data-template={selectedTemplate}
             style={{
               backgroundColor: '#ffffff',
-              color: '#000000',
-              borderColor: '#e2e8f0',
+              color: '#111827',
             }}
-            className="print-only-container max-w-2xl mx-auto p-8 sm:p-10 rounded-xl shadow-xs border print:shadow-none print:border-none print:p-0"
+            className={`max-w-2xl mx-auto rounded-xl shadow-xs transition-all ${
+              selectedTemplate === 'classic'
+                ? 'p-8 sm:p-10 border-2 border-slate-300 font-sans'
+                : selectedTemplate === 'modern'
+                ? 'p-8 sm:p-10 border border-slate-200 font-sans'
+                : selectedTemplate === 'compact'
+                ? 'p-5 sm:p-6 border-2 border-dashed border-slate-400 font-mono text-xs'
+                : 'p-8 sm:p-10 border-2 border-emerald-800 font-sans'
+            }`}
           >
-            {/* Header */}
-            <div
-              style={{ borderBottomColor: '#0f172a' }}
-              className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-6 border-b-2"
-            >
-              <div>
-                <h1 style={{ color: '#0f172a' }} className="text-2xl font-black tracking-tight">
+            {/* Header Section by Template */}
+            {selectedTemplate === 'elegant' ? (
+              <div className="bg-emerald-950 text-white -mx-8 sm:-mx-10 -mt-8 sm:-mt-10 p-6 sm:p-8 rounded-t-lg mb-6 border-b-4 border-emerald-600">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                  <div>
+                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-800 text-emerald-100 mb-2">
+                      Verified Store Invoice
+                    </span>
+                    <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                      {businessInfo.name}
+                    </h1>
+                    {businessInfo.tagline && (
+                      <p className="text-xs text-emerald-200 font-medium italic mt-0.5">
+                        {businessInfo.tagline}
+                      </p>
+                    )}
+                    <div className="text-xs text-emerald-100 mt-2 space-y-0.5">
+                      {businessInfo.phone && <p>📞 Phone: {businessInfo.phone}</p>}
+                      {businessInfo.address && <p>📍 {businessInfo.address}</p>}
+                    </div>
+                  </div>
+
+                  <div className="text-left sm:text-right">
+                    <div className="text-3xl font-black tracking-tight text-white">
+                      INVOICE
+                    </div>
+                    <div className="font-mono text-base font-black text-emerald-300 mt-1">
+                      #{invoice.invoiceNumber}
+                    </div>
+                    <div className="text-xs text-emerald-200 mt-1">
+                      Date: <span className="font-bold text-white">{formatDate(invoice.invoiceDate)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : selectedTemplate === 'classic' ? (
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-6 border-b-2 border-blue-900 mb-6">
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-black text-blue-950 tracking-tight">
+                    {businessInfo.name}
+                  </h1>
+                  {businessInfo.tagline && (
+                    <p className="text-xs font-semibold text-blue-700 italic mt-0.5">
+                      {businessInfo.tagline}
+                    </p>
+                  )}
+                  <div className="text-xs text-slate-700 mt-1.5 space-y-0.5">
+                    {businessInfo.phone && <p className="font-medium">Phone: {businessInfo.phone}</p>}
+                    {businessInfo.address && <p>{businessInfo.address}</p>}
+                  </div>
+                </div>
+
+                <div className="text-left sm:text-right">
+                  <div className="inline-block bg-blue-900 text-white font-black text-xs px-3 py-1 rounded tracking-wider uppercase mb-1">
+                    Tax / Retail Invoice
+                  </div>
+                  <div className="font-mono text-lg font-black text-blue-950">
+                    #{invoice.invoiceNumber}
+                  </div>
+                  <div className="text-xs text-slate-600 mt-0.5 font-medium">
+                    Date: <span className="font-bold text-slate-900">{formatDate(invoice.invoiceDate)}</span>
+                  </div>
+                </div>
+              </div>
+            ) : selectedTemplate === 'compact' ? (
+              <div className="border-b-2 border-dashed border-slate-400 pb-3 mb-4 text-center">
+                <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight">
                   {businessInfo.name}
                 </h1>
                 {businessInfo.tagline && (
-                  <p style={{ color: '#047857' }} className="text-xs font-medium italic mt-0.5">
-                    {businessInfo.tagline}
-                  </p>
+                  <p className="text-[10px] text-slate-600 italic">{businessInfo.tagline}</p>
                 )}
-                <div style={{ color: '#475569' }} className="text-xs mt-1 space-y-0.5">
-                  <p>Phone: {businessInfo.phone}</p>
-                  <p>Address: {businessInfo.address}</p>
+                <p className="text-[11px] text-slate-700 mt-0.5">
+                  Tel: {businessInfo.phone || 'N/A'} · {businessInfo.address}
+                </p>
+                <div className="flex justify-between items-center mt-2 pt-2 border-t border-dashed border-slate-300 text-xs">
+                  <span>BILL #{invoice.invoiceNumber}</span>
+                  <span>{formatDate(invoice.invoiceDate)}</span>
                 </div>
               </div>
+            ) : (
+              /* Modern Minimal */
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-6 border-b border-slate-200 mb-6">
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                    {businessInfo.name}
+                  </h1>
+                  {businessInfo.tagline && (
+                    <p className="text-xs text-slate-500 mt-0.5">{businessInfo.tagline}</p>
+                  )}
+                  <div className="text-xs text-slate-600 mt-1 space-y-0.5">
+                    <p>Phone: {businessInfo.phone}</p>
+                    <p>Address: {businessInfo.address}</p>
+                  </div>
+                </div>
 
-              <div className="text-left sm:text-right">
-                <div style={{ color: '#0f172a' }} className="text-3xl font-extrabold tracking-tight">
-                  INVOICE
-                </div>
-                <div style={{ color: '#0f172a' }} className="font-mono text-sm font-bold mt-1">
-                  #{invoice.invoiceNumber}
-                </div>
-                <div style={{ color: '#475569' }} className="text-xs mt-0.5">
-                  Date: <span style={{ color: '#0f172a' }} className="font-medium">{formatDate(invoice.invoiceDate)}</span>
+                <div className="text-left sm:text-right">
+                  <div className="text-2xl font-light text-slate-400 uppercase tracking-widest">
+                    Invoice
+                  </div>
+                  <div className="font-mono text-sm font-bold text-slate-900 mt-0.5">
+                    #{invoice.invoiceNumber}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    {formatDate(invoice.invoiceDate)}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Customer Box */}
             <div
-              style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}
-              className="my-6 p-4 rounded-lg border"
+              className={`mb-6 p-4 rounded-xl ${
+                selectedTemplate === 'elegant'
+                  ? 'bg-emerald-50/70 border border-emerald-200'
+                  : selectedTemplate === 'classic'
+                  ? 'bg-blue-50/60 border border-blue-200'
+                  : selectedTemplate === 'compact'
+                  ? 'bg-slate-50 border border-dashed border-slate-400 p-2.5'
+                  : 'bg-slate-50 border border-slate-200'
+              }`}
             >
-              <span style={{ color: '#64748b' }} className="text-[11px] font-bold uppercase tracking-wider block mb-1">
-                Billed Customer
+              <span className="text-[10px] font-bold uppercase tracking-wider block text-slate-500 mb-0.5">
+                Billed To Customer:
               </span>
-              <p style={{ color: '#0f172a' }} className="text-base font-bold">{invoice.customerName}</p>
+              <p className="text-base font-bold text-slate-900">{invoice.customerName}</p>
               {invoice.customerPhone && (
-                <p style={{ color: '#475569' }} className="text-xs mt-0.5">Phone: {invoice.customerPhone}</p>
+                <p className="text-xs text-slate-700 font-mono mt-0.5 font-medium">
+                  Phone: {invoice.customerPhone}
+                </p>
               )}
             </div>
 
             {/* Items Table */}
-            <div className="my-6 overflow-x-auto">
+            <div className="mb-6 overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr
-                    style={{
-                      backgroundColor: '#0f172a',
-                      color: '#ffffff',
-                      borderBottomColor: '#0f172a',
-                    }}
-                    className="border-b-2 text-[11px] uppercase tracking-wider"
+                    className={`uppercase tracking-wider font-bold ${
+                      selectedTemplate === 'elegant'
+                        ? 'bg-emerald-900 text-white text-[11px]'
+                        : selectedTemplate === 'classic'
+                        ? 'bg-blue-900 text-white text-[11px]'
+                        : selectedTemplate === 'compact'
+                        ? 'border-b border-t border-dashed border-slate-700 text-slate-900 text-[10px]'
+                        : 'border-b border-slate-300 text-slate-700 text-[11px] bg-slate-100'
+                    }`}
                   >
-                    <th className="py-2.5 px-3 font-bold">Item Description</th>
-                    <th className="py-2.5 px-3 text-right font-bold w-16">Qty</th>
-                    <th className="py-2.5 px-3 text-right font-bold w-28">Unit Price</th>
-                    <th className="py-2.5 px-3 text-right font-bold w-28">Amount</th>
+                    <th className="py-2.5 px-3">Item Description</th>
+                    <th className="py-2.5 px-3 text-right w-16">Qty</th>
+                    <th className="py-2.5 px-3 text-right w-28">Unit Price</th>
+                    <th className="py-2.5 px-3 text-right w-28">Amount</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className={`divide-y ${selectedTemplate === 'compact' ? 'divide-dashed divide-slate-300' : 'divide-slate-200'}`}>
                   {invoice.items.map((it, idx) => (
                     <tr
                       key={it.id || idx}
-                      style={{
-                        borderBottom: '1px solid #e2e8f0',
-                        backgroundColor: idx % 2 === 1 ? '#f8fafc' : '#ffffff',
-                      }}
+                      className={idx % 2 === 1 && selectedTemplate !== 'compact' ? 'bg-slate-50/60' : 'bg-white'}
                     >
-                      <td style={{ color: '#1e293b' }} className="py-3 px-3 font-semibold">{it.name}</td>
-                      <td style={{ color: '#334155' }} className="py-3 px-3 text-right font-mono tabular-nums">
-                        {it.quantity}
-                      </td>
-                      <td style={{ color: '#334155' }} className="py-3 px-3 text-right font-mono tabular-nums">
-                        {formatRupees(it.unitPrice)}
-                      </td>
-                      <td style={{ color: '#0f172a' }} className="py-3 px-3 text-right font-mono tabular-nums font-bold">
-                        {formatRupees(it.amount)}
-                      </td>
+                      <td className="py-2.5 px-3 font-semibold text-slate-900">{it.name}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-slate-700">{it.quantity}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-slate-700">{formatRupees(it.unitPrice)}</td>
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-950">{formatRupees(it.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -432,57 +408,49 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
             </div>
 
             {/* Totals Section */}
-            <div style={{ borderBottomColor: '#e2e8f0' }} className="flex justify-end pt-2 pb-6 border-b">
+            <div className="flex justify-end pt-2 pb-6 border-b border-slate-200">
               <div
-                style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}
-                className="w-full sm:w-80 p-4 rounded-lg border space-y-2 text-xs"
+                className={`w-full sm:w-80 p-4 rounded-xl space-y-2 text-xs ${
+                  selectedTemplate === 'elegant'
+                    ? 'bg-emerald-50/80 border-2 border-emerald-300'
+                    : selectedTemplate === 'classic'
+                    ? 'bg-blue-50/80 border-2 border-blue-300'
+                    : selectedTemplate === 'compact'
+                    ? 'bg-slate-50 border border-dashed border-slate-400 p-3'
+                    : 'bg-slate-50 border border-slate-200'
+                }`}
               >
                 {/* Items Subtotal */}
-                <div style={{ color: '#475569' }} className="flex justify-between">
+                <div className="flex justify-between text-slate-700">
                   <span>Items Subtotal:</span>
-                  <span style={{ color: '#0f172a' }} className="font-mono tabular-nums font-bold">
-                    {formatRupees(invoice.subtotal)}
-                  </span>
+                  <span className="font-mono font-bold text-slate-900">{formatRupees(invoice.subtotal)}</span>
                 </div>
 
                 {/* Previous Balance */}
-                <div style={{ color: '#475569' }} className="flex justify-between">
+                <div className="flex justify-between text-slate-700">
                   <span>Previous Balance:</span>
-                  <span style={{ color: '#b45309' }} className="font-mono tabular-nums font-semibold">
-                    {formatRupees(invoice.previousBalance)}
-                  </span>
+                  <span className="font-mono font-bold text-amber-900">{formatRupees(invoice.previousBalance)}</span>
                 </div>
 
                 {/* Total Bill */}
-                <div
-                  style={{ color: '#0f172a', borderTopColor: '#cbd5e1' }}
-                  className="flex justify-between items-baseline pt-2 border-t text-sm font-bold"
-                >
+                <div className="flex justify-between items-baseline pt-2 border-t border-slate-300 text-sm font-bold text-slate-950">
                   <span>Total Bill:</span>
-                  <span style={{ color: '#0f172a' }} className="text-base font-mono tabular-nums font-extrabold">
-                    {formatRupees(totalBill)}
-                  </span>
+                  <span className="text-base font-mono font-black">{formatRupees(totalBill)}</span>
                 </div>
 
                 {/* Payment Received */}
-                <div style={{ color: '#0369a1' }} className="flex justify-between pt-0.5">
-                  <span className="font-semibold">Payment Received:</span>
-                  <span className="font-mono tabular-nums font-bold">
-                    {formatRupees(paymentReceived)}
-                  </span>
+                <div className="flex justify-between pt-0.5 text-sky-900 font-bold">
+                  <span>Payment Received:</span>
+                  <span className="font-mono">{formatRupees(paymentReceived)}</span>
                 </div>
 
                 {/* Remaining Balance */}
-                <div
-                  style={{ color: '#0f172a', borderTopColor: '#0f172a' }}
-                  className="flex justify-between items-baseline pt-2 border-t-2 text-sm font-bold"
-                >
+                <div className="flex justify-between items-baseline pt-2 border-t-2 border-slate-900 text-sm font-bold">
                   <span>Remaining Balance:</span>
                   <span
-                    style={{
-                      color: remainingBalance === 0 ? '#047857' : remainingBalance > 0 ? '#b45309' : '#0369a1',
-                    }}
-                    className="text-lg font-mono tabular-nums font-extrabold"
+                    className={`text-lg font-mono font-black ${
+                      remainingBalance === 0 ? 'text-emerald-800' : remainingBalance > 0 ? 'text-amber-900' : 'text-sky-900'
+                    }`}
                   >
                     {formatRupees(remainingBalance)}
                   </span>
@@ -491,8 +459,8 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
             </div>
 
             {/* Footer */}
-            <div style={{ color: '#64748b' }} className="mt-6 pt-4 text-center text-[11px]">
-              Thank you for your business! Please keep this invoice for your records.
+            <div className="mt-6 text-center text-xs text-slate-600 font-medium">
+              Thank you for your business! For inquiries, contact {businessInfo.phone || 'us'}.
             </div>
           </div>
         </div>
@@ -501,3 +469,4 @@ REMAINING BALANCE: ${formatRupees(remainingBalance)}
     </div>
   );
 };
+
