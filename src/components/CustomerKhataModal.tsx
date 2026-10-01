@@ -251,137 +251,172 @@ _Generated via ${storeTitle} POS System_`;
           <div
             id="khata-report-area"
             data-template={selectedTemplate}
-            className={`export-card-wrapper p-4 sm:p-6 space-y-6 bg-white text-slate-900 border-none print:p-6 ${
+            className={`export-card-area export-card-wrapper p-4 sm:p-6 space-y-6 bg-white text-slate-900 border-none print:p-6 ${
               selectedTemplate === 'compact' ? 'font-mono text-xs' : 'font-sans'
             }`}
             style={{ backgroundColor: '#ffffff', minHeight: '300px', color: '#111827' }}
           >
             {/* Statement Header Section by Template */}
             {selectedTemplate === 'elegant' ? (
-              <div className="bg-emerald-950 text-white -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 p-6 sm:p-7 rounded-t-xl mb-4 border-b-4 border-emerald-600">
+              <div
+                className="-mx-4 sm:-mx-6 -mt-4 sm:-mt-6 p-6 sm:p-7 rounded-t-xl mb-4"
+                style={{ backgroundColor: '#064e3b', color: '#ffffff', borderBottom: '4px solid #059669' }}
+              >
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                   <div>
-                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-800 text-emerald-100 mb-2">
+                    <span
+                      className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider mb-2"
+                      style={{ backgroundColor: '#047857', color: '#ffffff' }}
+                    >
                       Customer Ledger Account
                     </span>
-                    <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                    <h1 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: '#ffffff' }}>
                       {businessInfo.name || 'Store Financial Statement'}
                     </h1>
                     {businessInfo.tagline && (
-                      <p className="text-xs text-emerald-200 font-medium italic mt-0.5">{businessInfo.tagline}</p>
+                      <p className="text-xs font-medium italic mt-0.5" style={{ color: '#a7f3d0' }}>
+                        {businessInfo.tagline}
+                      </p>
                     )}
-                    <div className="text-xs text-emerald-100 mt-2 space-y-0.5">
+                    <div className="text-xs mt-2 space-y-0.5" style={{ color: '#d1fae5' }}>
                       {businessInfo.address && <p>📍 {businessInfo.address}</p>}
                       {businessInfo.phone && <p>📞 Phone: {businessInfo.phone}</p>}
                     </div>
                   </div>
 
                   <div className="text-left sm:text-right">
-                    <div className="inline-block bg-emerald-800 text-white font-bold text-xs px-3 py-1 rounded tracking-wider uppercase mb-1">
+                    <div
+                      className="inline-block font-bold text-xs px-3 py-1 rounded tracking-wider uppercase mb-1"
+                      style={{ backgroundColor: '#047857', color: '#ffffff' }}
+                    >
                       Account Statement
                     </div>
-                    <p className="text-xs text-emerald-200">
+                    <p className="text-xs" style={{ color: '#a7f3d0' }}>
                       Generated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-emerald-800 grid grid-cols-2 gap-4 text-xs bg-emerald-900/60 p-3 rounded-lg">
+                <div
+                  className="mt-4 pt-3 grid grid-cols-2 gap-4 text-xs p-3 rounded-lg"
+                  style={{ backgroundColor: '#047857', borderTop: '1px solid #059669', color: '#ffffff' }}
+                >
                   <div>
-                    <span className="text-emerald-300 font-bold uppercase text-[10px] block">Customer Name:</span>
-                    <p className="font-bold text-sm text-white">{customer.name}</p>
+                    <span className="font-bold uppercase text-[10px] block" style={{ color: '#6ee7b7' }}>Customer Name:</span>
+                    <p className="font-bold text-sm" style={{ color: '#ffffff' }}>{customer.name}</p>
                   </div>
                   <div>
-                    <span className="text-emerald-300 font-bold uppercase text-[10px] block">Contact Phone:</span>
-                    <p className="font-mono font-semibold text-white">{customer.phone}</p>
+                    <span className="font-bold uppercase text-[10px] block" style={{ color: '#6ee7b7' }}>Contact Phone:</span>
+                    <p className="font-mono font-semibold" style={{ color: '#ffffff' }}>{customer.phone}</p>
                   </div>
                 </div>
               </div>
             ) : selectedTemplate === 'classic' ? (
-              <div className="p-4 sm:p-5 border-b-2 border-blue-900 bg-white rounded-xl">
+              <div
+                className="p-4 sm:p-5 rounded-xl"
+                style={{ backgroundColor: '#ffffff', borderBottom: '2px solid #1e3a8a' }}
+              >
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                   <div>
-                    <h1 className="text-xl sm:text-2xl font-black text-blue-950 uppercase tracking-tight">
+                    <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight" style={{ color: '#172554' }}>
                       {businessInfo.name || 'Store Statement'}
                     </h1>
                     {businessInfo.tagline && (
-                      <p className="text-xs text-blue-700 font-semibold italic">{businessInfo.tagline}</p>
+                      <p className="text-xs font-semibold italic" style={{ color: '#1d4ed8' }}>{businessInfo.tagline}</p>
                     )}
-                    <div className="text-xs text-slate-700 mt-1 space-y-0.5">
+                    <div className="text-xs mt-1 space-y-0.5" style={{ color: '#334155' }}>
                       {businessInfo.address && <p>{businessInfo.address}</p>}
                       {businessInfo.phone && <p className="font-medium">Phone: {businessInfo.phone}</p>}
                     </div>
                   </div>
 
                   <div className="text-left sm:text-right">
-                    <div className="inline-block bg-blue-900 text-white font-bold text-xs px-3 py-1 rounded tracking-wider uppercase mb-1">
+                    <div
+                      className="inline-block font-bold text-xs px-3 py-1 rounded tracking-wider uppercase mb-1"
+                      style={{ backgroundColor: '#1e3a8a', color: '#ffffff' }}
+                    >
                       Customer Ledger Statement
                     </div>
-                    <p className="text-xs text-slate-700 font-medium">
+                    <p className="text-xs font-medium" style={{ color: '#334155' }}>
                       Date: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-blue-200 grid grid-cols-2 gap-4 text-xs bg-blue-50/70 p-3 rounded-lg">
+                <div
+                  className="mt-4 pt-3 grid grid-cols-2 gap-4 text-xs p-3 rounded-lg"
+                  style={{ backgroundColor: '#eff6ff', borderTop: '1px solid #bfdbfe' }}
+                >
                   <div>
-                    <span className="text-blue-900 font-bold uppercase text-[10px] block">Customer Name:</span>
-                    <p className="font-bold text-sm text-slate-900">{customer.name}</p>
+                    <span className="font-bold uppercase text-[10px] block" style={{ color: '#1e3a8a' }}>Customer Name:</span>
+                    <p className="font-bold text-sm" style={{ color: '#0f172a' }}>{customer.name}</p>
                   </div>
                   <div>
-                    <span className="text-blue-900 font-bold uppercase text-[10px] block">Contact Phone:</span>
-                    <p className="font-mono font-semibold text-slate-900">{customer.phone}</p>
+                    <span className="font-bold uppercase text-[10px] block" style={{ color: '#1e3a8a' }}>Contact Phone:</span>
+                    <p className="font-mono font-semibold" style={{ color: '#0f172a' }}>{customer.phone}</p>
                   </div>
                 </div>
               </div>
             ) : selectedTemplate === 'compact' ? (
-              <div className="p-3 border-b-2 border-dashed border-slate-400 text-center">
-                <h1 className="text-lg font-black uppercase text-slate-900">
+              <div
+                className="p-3 text-center"
+                style={{ backgroundColor: '#ffffff', borderBottom: '2px dashed #94a3b8' }}
+              >
+                <h1 className="text-lg font-black uppercase" style={{ color: '#0f172a' }}>
                   {businessInfo.name || 'Account Statement'}
                 </h1>
-                <p className="text-[11px] text-slate-700">
+                <p className="text-[11px]" style={{ color: '#334155' }}>
                   Tel: {businessInfo.phone || 'N/A'} · {businessInfo.address}
                 </p>
-                <div className="mt-2 pt-2 border-t border-dashed border-slate-300 flex justify-between items-center text-xs">
+                <div
+                  className="mt-2 pt-2 flex justify-between items-center text-xs"
+                  style={{ borderTop: '1px dashed #cbd5e1' }}
+                >
                   <span>CUSTOMER: {customer.name} ({customer.phone})</span>
                   <span>{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
                 </div>
               </div>
             ) : (
               /* Modern Minimal */
-              <div className="p-4 sm:p-5 border-b border-slate-200 bg-white rounded-xl">
+              <div
+                className="p-4 sm:p-5 bg-white rounded-xl"
+                style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0' }}
+              >
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                   <div>
-                    <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                    <h1 className="text-xl font-bold tracking-tight" style={{ color: '#0f172a' }}>
                       {businessInfo.name || 'Store Statement'}
                     </h1>
                     {businessInfo.tagline && (
-                      <p className="text-xs text-slate-500 font-medium">{businessInfo.tagline}</p>
+                      <p className="text-xs font-medium" style={{ color: '#64748b' }}>{businessInfo.tagline}</p>
                     )}
-                    <div className="text-xs text-slate-600 mt-1 space-y-0.5">
+                    <div className="text-xs mt-1 space-y-0.5" style={{ color: '#475569' }}>
                       {businessInfo.address && <p>{businessInfo.address}</p>}
                       {businessInfo.phone && <p>Phone: {businessInfo.phone}</p>}
                     </div>
                   </div>
 
                   <div className="text-left sm:text-right">
-                    <div className="text-sm font-bold uppercase tracking-wider text-slate-700">
+                    <div className="text-sm font-bold uppercase tracking-wider" style={{ color: '#334155' }}>
                       Customer Ledger
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-xs mt-0.5" style={{ color: '#64748b' }}>
                       {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-4 text-xs bg-slate-50 p-3 rounded-lg">
+                <div
+                  className="mt-4 pt-3 grid grid-cols-2 gap-4 text-xs p-3 rounded-lg"
+                  style={{ backgroundColor: '#f8fafc', borderTop: '1px solid #f1f5f9' }}
+                >
                   <div>
-                    <span className="text-slate-400 font-bold uppercase text-[10px] block">Customer Name:</span>
-                    <p className="font-bold text-sm text-slate-900">{customer.name}</p>
+                    <span className="font-bold uppercase text-[10px] block" style={{ color: '#94a3b8' }}>Customer Name:</span>
+                    <p className="font-bold text-sm" style={{ color: '#0f172a' }}>{customer.name}</p>
                   </div>
                   <div>
-                    <span className="text-slate-400 font-bold uppercase text-[10px] block">Contact Phone:</span>
-                    <p className="font-mono font-semibold text-slate-800">{customer.phone}</p>
+                    <span className="font-bold uppercase text-[10px] block" style={{ color: '#94a3b8' }}>Contact Phone:</span>
+                    <p className="font-mono font-semibold" style={{ color: '#1e293b' }}>{customer.phone}</p>
                   </div>
                 </div>
               </div>

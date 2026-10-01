@@ -2,42 +2,26 @@ import html2canvas from 'html2canvas';
 
 /**
  * Universal JPG Export Utility for InvoiceFlow
- * Supports:
- * - History View (#history-report-area)
- * - View Khata (#khata-report-area & #ledger-render-area)
- * - Monthly View (#monthly-report-area)
- * - Yearly View (#yearly-report-area)
- * - Invoice Print (#invoice-render-area)
- * - Fallback query selector (.export-card-wrapper)
+ * Robust against Tailwind CSS v4 OKLCH colors, CSS variable gradients,
+ * and mobile canvas memory limits.
  */
 export const downloadAsJpg = async (elementId: string, fileName: string): Promise<boolean> => {
-  // 1. Look up primary element ID with smart fallbacks
-  let target = document.getElementById(elementId);
-  
-  if (!target && elementId === 'khata-report-area') {
-    target = document.getElementById('ledger-render-area');
-  } else if (!target && elementId === 'ledger-render-area') {
-    target = document.getElementById('khata-report-area');
-  }
+  const target =
+    document.getElementById(elementId) ||
+    (document.querySelector('.export-card-area') as HTMLElement) ||
+    (document.querySelector('.export-card-wrapper') as HTMLElement);
 
   if (!target) {
-    target = document.querySelector('.export-card-wrapper') as HTMLElement;
-  }
-
-  if (!target) {
-    console.error(`[downloadAsJpg] Report element (${elementId}) not found in document.`);
-    alert(`Report element (${elementId}) not ready. Please try again.`);
+    console.error(`[downloadAsJpg] Element #${elementId} or .export-card-area not found.`);
+    alert('Report area not found. Please try again.');
     return false;
   }
 
   try {
-    // 2. Allow browser frame to finish painting fonts & layout elements
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    // Allow UI to settle and fonts to render
+    await new Promise((res) => setTimeout(res, 300));
 
-    // 3. Dynamic scale to avoid mobile canvas memory limits (1.5x mobile, 2x desktop)
     const scale = typeof window !== 'undefined' && window.innerWidth < 768 ? 1.5 : 2;
-
-    const actualId = target.id || elementId;
 
     const canvas = await html2canvas(target, {
       scale,
@@ -46,15 +30,15 @@ export const downloadAsJpg = async (elementId: string, fileName: string): Promis
       foreignObjectRendering: false,
       backgroundColor: '#ffffff',
       logging: false,
+      ignoreElements: (el) =>
+        el.classList.contains('no-print') ||
+        el.classList.contains('print:hidden') ||
+        el.getAttribute('data-no-export') === 'true',
       onclone: (clonedDoc) => {
         const clonedEl =
-          clonedDoc.getElementById(actualId) ||
           clonedDoc.getElementById(elementId) ||
-          clonedDoc.getElementById('khata-report-area') ||
-          clonedDoc.getElementById('ledger-render-area') ||
-          clonedDoc.getElementById('monthly-report-area') ||
-          clonedDoc.getElementById('yearly-report-area') ||
-          clonedDoc.getElementById('history-report-area') ||
+          clonedDoc.getElementById(target.id) ||
+          (clonedDoc.querySelector('.export-card-area') as HTMLElement) ||
           (clonedDoc.querySelector('.export-card-wrapper') as HTMLElement);
 
         if (clonedEl) {
@@ -64,27 +48,39 @@ export const downloadAsJpg = async (elementId: string, fileName: string): Promis
           clonedEl.style.color = '#111827';
           clonedEl.style.minHeight = '300px';
 
-          // Sanitize child node styles to avoid CSS parsing locks or oklch errors
-          const nodes = clonedEl.querySelectorAll('*');
-          nodes.forEach((node: any) => {
+          // Convert all calculated text, bg, border, and gradient styles to standard RGB/HEX
+          const allNodes = clonedEl.querySelectorAll('*');
+          allNodes.forEach((node: any) => {
             if (node.style) {
-              node.style.fontFamily = 'sans-serif';
+              node.style.fontFamily = 'Arial, sans-serif';
 
               try {
-                const computed = clonedDoc.defaultView?.getComputedStyle(node);
+                const computed =
+                  clonedDoc.defaultView?.getComputedStyle(node) ||
+                  window.getComputedStyle(node);
+
                 if (computed) {
-                  if (computed.color && computed.color.includes('oklch')) {
-                    node.style.color = '#111827';
-                  }
+                  // Clean oklch or unsupported color functions
                   if (computed.backgroundColor && computed.backgroundColor.includes('oklch')) {
                     node.style.backgroundColor = '#ffffff';
                   }
+                  if (computed.color && computed.color.includes('oklch')) {
+                    node.style.color = '#111827';
+                  }
                   if (computed.borderColor && computed.borderColor.includes('oklch')) {
-                    node.style.borderColor = '#cbd5e1';
+                    node.style.borderColor = '#e5e7eb';
+                  }
+
+                  // Clear CSS gradient variables that might contain oklch
+                  if (
+                    node.style.backgroundImage &&
+                    node.style.backgroundImage.includes('oklch')
+                  ) {
+                    node.style.backgroundImage = 'none';
                   }
                 }
               } catch {
-                // Ignore style read issues on cloned nodes
+                // Ignore computed style access errors on detached nodes
               }
             }
           });
