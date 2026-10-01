@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BusinessInfo, SecurityConfig } from '../types/invoice';
 import { authenticateBiometrics } from '../utils/security';
+import { ResetSecurityModal } from './ResetSecurityModal';
 
 interface SecurityLockScreenProps {
   businessInfo: BusinessInfo;
   securityConfig: SecurityConfig;
   onUnlock: () => void;
+  onResetSecurity?: (newPin?: string) => void;
   onEmergencyReset?: () => void;
 }
 
@@ -13,12 +15,14 @@ export const SecurityLockScreen: React.FC<SecurityLockScreenProps> = ({
   businessInfo,
   securityConfig,
   onUnlock,
+  onResetSecurity,
   onEmergencyReset,
 }) => {
   const [pinDigits, setPinDigits] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isShaking, setIsShaking] = useState<boolean>(false);
   const [isBiometricPrompting, setIsBiometricPrompting] = useState<boolean>(false);
+  const [showResetModal, setShowResetModal] = useState<boolean>(false);
 
   const verifyPin = useCallback(
     (enteredPin: string) => {
@@ -255,22 +259,32 @@ export const SecurityLockScreen: React.FC<SecurityLockScreenProps> = ({
           </div>
         )}
 
-        {/* Emergency Reset or Demo Recovery */}
-        {onEmergencyReset && (
-          <div className="pt-4 border-t border-slate-900 w-full text-center">
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm('Reset PIN and restore default ledger settings? All invoices will be preserved.')) {
-                  onEmergencyReset();
-                }
-              }}
-              className="text-[11px] text-slate-500 hover:text-slate-400 underline"
-            >
-              Forgot 4-digit PIN?
-            </button>
-          </div>
-        )}
+        {/* Forgot PIN / Reset Security Option (strictly protected with Firebase auth) */}
+        <div className="pt-4 border-t border-slate-900 w-full text-center">
+          <button
+            type="button"
+            onClick={() => setShowResetModal(true)}
+            className="text-[11px] text-slate-400 hover:text-emerald-400 underline transition-colors flex items-center justify-center gap-1.5 mx-auto"
+          >
+            <i className="fa-solid fa-key text-[10px]"></i>
+            <span>Forgot 4-digit PIN? Verify Password to Reset</span>
+          </button>
+        </div>
+
+        {/* Firebase Password Re-authentication & Reset PIN Modal */}
+        <ResetSecurityModal
+          isOpen={showResetModal}
+          onClose={() => setShowResetModal(false)}
+          onSuccess={(newPin) => {
+            if (onResetSecurity) {
+              onResetSecurity(newPin);
+            } else if (onEmergencyReset) {
+              onEmergencyReset();
+            }
+          }}
+          title="Forgot PIN / Reset Security"
+          description="Authenticate with your Firebase account password or Google account to unlock and set a new 4-digit PIN."
+        />
       </div>
     </div>
   );

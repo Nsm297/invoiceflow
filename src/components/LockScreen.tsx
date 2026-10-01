@@ -6,6 +6,7 @@ export interface LockScreenProps {
   businessInfo: BusinessInfo;
   securityConfig: SecurityConfig;
   onUnlock: () => void;
+  onResetSecurity?: (newPin?: string) => void;
   onEmergencyReset?: () => void;
 }
 

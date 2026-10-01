@@ -24,6 +24,8 @@ import {
   syncDataToFirestore,
   fetchDataFromFirestore,
   checkRedirectLogin,
+  syncSecuritySettingsToFirestore,
+  fetchSecuritySettingsFromFirestore,
 } from './utils/firebase';
 import { formatRupees, shareInvoiceViaWhatsApp } from './utils/formatters';
 import {
@@ -45,6 +47,7 @@ import { YearlyStatement } from './components/YearlyStatement';
 import { InvoicePrintModal } from './components/InvoicePrintModal';
 import { StoreInfoModule } from './components/StoreInfoModule';
 import { SecurityLockScreen } from './components/SecurityLockScreen';
+import { PinConfirmModal } from './components/PinConfirmModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { OfflineIndicator } from './components/OfflineIndicator';
 
@@ -77,6 +80,20 @@ function MainApp() {
     return Boolean(sec.pinEnabled && sec.pin);
   });
 
+  // PIN / Confirmation prompt state for protected data deletions
+  const [pinConfirmModalState, setPinConfirmModalState] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    itemDetails?: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+  });
+
   // Transient states
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [preselectedCustomer, setPreselectedCustomer] = useState<Customer | null>(null);
@@ -101,19 +118,39 @@ function MainApp() {
     businessInfoRef.current = businessInfo;
   }, [businessInfo]);
 
-  // Load stored data on mount
+  // Load stored data on mount & synchronize permanent user-scoped security config
   useEffect(() => {
     setCustomers(getStoredCustomers());
     setInvoices(getStoredInvoices());
     setBusinessInfo(getStoredBusinessInfo());
-    const sec = getStoredSecurityConfig();
+
+    const uid = currentUser?.uid;
+    const sec = getStoredSecurityConfig(uid);
     setSecurityConfig(sec);
+
+    if (uid) {
+      // Sync security config from Firestore if available
+      fetchSecuritySettingsFromFirestore(uid).then((cloudSec) => {
+        if (cloudSec && cloudSec.pin) {
+          const merged: SecurityConfig = {
+            pinEnabled: Boolean(cloudSec.pinEnabled),
+            pin: cloudSec.pin,
+            biometricEnabled: Boolean(cloudSec.biometricEnabled),
+            credentialId: cloudSec.credentialId,
+            autoLockOnIdle: Boolean(cloudSec.autoLockOnIdle),
+          };
+          setSecurityConfig(merged);
+          saveStoredSecurityConfig(merged, uid);
+        }
+      });
+    }
+
     const isUnlockedInSession =
       typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pwa_unlocked') === 'true';
     if (sec.pinEnabled && sec.pin && !isUnlockedInSession) {
       setIsLocked(true);
     }
-  }, []);
+  }, [currentUser]);
 
   const showToast = useCallback((type: 'success' | 'error' | 'info', title: string, message?: string) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
@@ -258,6 +295,7 @@ function MainApp() {
 
   const handleGoogleSignOut = async () => {
     try {
+      const uid = currentUser?.uid;
       await logoutUser();
       clearAllUserData();
       if (typeof sessionStorage !== 'undefined') {
@@ -268,8 +306,12 @@ function MainApp() {
       setCustomers([]);
       setInvoices([]);
       setBusinessInfo(DEFAULT_BUSINESS_INFO);
-      setSecurityConfig(DEFAULT_SECURITY_CONFIG);
-      setIsLocked(false);
+      // Permanent security settings are preserved and never reset on logout
+      const preservedSec = getStoredSecurityConfig(uid);
+      setSecurityConfig(preservedSec);
+      if (preservedSec.pinEnabled && preservedSec.pin) {
+        setIsLocked(true);
+      }
       setEditingInvoice(null);
       setPreselectedCustomer(null);
       setPreviewInvoice(null);
@@ -359,8 +401,12 @@ function MainApp() {
   };
 
   const handleSaveSecurityConfig = (config: SecurityConfig) => {
-    saveStoredSecurityConfig(config);
+    const uid = currentUser?.uid;
+    saveStoredSecurityConfig(config, uid);
     setSecurityConfig(config);
+    if (uid) {
+      syncSecuritySettingsToFirestore(uid, config);
+    }
     showToast(
       'success',
       'Security Settings Updated',
@@ -389,20 +435,36 @@ function MainApp() {
     showToast('success', 'Unlocked Successfully', `Welcome back to ${businessInfo.name || 'InvoiceFlow'}!`);
   };
 
-  const handleEmergencyResetPin = () => {
-    const updated: SecurityConfig = {
-      pinEnabled: false,
-      pin: '',
-      biometricEnabled: false,
-      credentialId: undefined,
-    };
-    saveStoredSecurityConfig(updated);
-    setSecurityConfig(updated);
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.removeItem('pwa_unlocked');
+  const handleResetSecurityFromLockScreen = (newPin?: string) => {
+    const uid = currentUser?.uid;
+    if (newPin) {
+      const updated: SecurityConfig = {
+        ...securityConfig,
+        pin: newPin,
+        pinEnabled: true,
+      };
+      saveStoredSecurityConfig(updated, uid);
+      setSecurityConfig(updated);
+      if (uid) {
+        syncSecuritySettingsToFirestore(uid, updated);
+      }
+      handleUnlockApp();
+      showToast('success', 'Security PIN Reset', 'Your new 4-digit PIN has been saved permanently.');
+    } else {
+      const updated: SecurityConfig = {
+        pinEnabled: false,
+        pin: '',
+        biometricEnabled: false,
+        credentialId: undefined,
+      };
+      saveStoredSecurityConfig(updated, uid);
+      setSecurityConfig(updated);
+      if (uid) {
+        syncSecuritySettingsToFirestore(uid, updated);
+      }
+      handleUnlockApp();
+      showToast('info', 'PIN Lock Disabled', 'Security PIN lock has been disabled.');
     }
-    setIsLocked(false);
-    showToast('info', 'PIN Lock Reset', 'PIN protection has been disabled.');
   };
 
   // WhatsApp share action with high-resolution JPG image capture & Web Share API
@@ -434,12 +496,20 @@ function MainApp() {
 
   const handleDeleteCustomer = (id: string) => {
     const cust = customers.find((c) => c.id === id);
-    const updated = deleteCustomer(id);
-    setCustomers(updated);
-    if (currentUser) {
-      autoSyncToCloud(currentUser.uid, { customers: updated });
-    }
-    showToast('info', 'Customer Deleted', cust ? `${cust.name} removed.` : undefined);
+    setPinConfirmModalState({
+      isOpen: true,
+      title: 'Authorize Customer Deletion',
+      description: `Deleting ${cust?.name || 'this customer'} will permanently erase their balance & profile from the ledger.`,
+      itemDetails: cust ? `Customer: ${cust.name} | Phone: ${cust.phone || 'N/A'}` : undefined,
+      onConfirm: () => {
+        const updated = deleteCustomer(id);
+        setCustomers(updated);
+        if (currentUser) {
+          autoSyncToCloud(currentUser.uid, { customers: updated });
+        }
+        showToast('info', 'Customer Deleted', cust ? `${cust.name} removed.` : undefined);
+      },
+    });
   };
 
   const handleCreateInvoiceForCustomer = (customer: Customer) => {
@@ -497,12 +567,22 @@ function MainApp() {
 
   const handleDeleteInvoice = (id: string) => {
     const inv = invoices.find((i) => i.id === id);
-    const updated = deleteInvoice(id);
-    setInvoices(updated);
-    if (currentUser) {
-      autoSyncToCloud(currentUser.uid, { invoices: updated });
-    }
-    showToast('info', 'Invoice Deleted', inv ? `#${inv.invoiceNumber} removed.` : undefined);
+    setPinConfirmModalState({
+      isOpen: true,
+      title: 'Authorize Invoice Deletion',
+      description: `Permanently delete invoice #${inv?.invoiceNumber || id}? This modifies customer running balances.`,
+      itemDetails: inv
+        ? `Invoice #${inv.invoiceNumber} | Customer: ${inv.customerName} | Total: ${formatRupees(inv.totalBill)}`
+        : undefined,
+      onConfirm: () => {
+        const updated = deleteInvoice(id);
+        setInvoices(updated);
+        if (currentUser) {
+          autoSyncToCloud(currentUser.uid, { invoices: updated });
+        }
+        showToast('info', 'Invoice Deleted', inv ? `#${inv.invoiceNumber} removed.` : undefined);
+      },
+    });
   };
 
   const handleCreateNewInvoice = () => {
@@ -547,20 +627,28 @@ function MainApp() {
   };
 
   const handleResetData = () => {
-    const res = resetAllDemoData();
-    setCustomers(res.customers);
-    setInvoices(res.invoices);
-    setBusinessInfo(res.businessInfo);
-    setEditingInvoice(null);
-    setPreselectedCustomer(null);
-    if (currentUser) {
-      autoSyncToCloud(currentUser.uid, {
-        customers: res.customers,
-        invoices: res.invoices,
-        businessInfo: res.businessInfo,
-      });
-    }
-    showToast('success', 'Demo Data Restored', 'Loaded sample customers and invoices in Rupees (Rs.).');
+    setPinConfirmModalState({
+      isOpen: true,
+      title: 'Authorize Ledger / Demo Reset',
+      description: 'Resetting ledger data will replace your current customers and invoices with sample demo records.',
+      itemDetails: `Current: ${invoices.length} invoices, ${customers.length} customers`,
+      onConfirm: () => {
+        const res = resetAllDemoData();
+        setCustomers(res.customers);
+        setInvoices(res.invoices);
+        setBusinessInfo(res.businessInfo);
+        setEditingInvoice(null);
+        setPreselectedCustomer(null);
+        if (currentUser) {
+          autoSyncToCloud(currentUser.uid, {
+            customers: res.customers,
+            invoices: res.invoices,
+            businessInfo: res.businessInfo,
+          });
+        }
+        showToast('success', 'Demo Data Restored', 'Loaded sample customers and invoices in Rupees (Rs.).');
+      },
+    });
   };
 
   if (authLoading) {
@@ -607,7 +695,7 @@ function MainApp() {
           businessInfo={businessInfo}
           securityConfig={securityConfig}
           onUnlock={handleUnlockApp}
-          onEmergencyReset={handleEmergencyResetPin}
+          onResetSecurity={handleResetSecurityFromLockScreen}
         />
       )}
 
@@ -895,6 +983,17 @@ function MainApp() {
           </div>
         </div>
       )}
+
+      {/* 4-Digit PIN & Action Confirmation Modal for Protected Deletions */}
+      <PinConfirmModal
+        isOpen={pinConfirmModalState.isOpen}
+        onClose={() => setPinConfirmModalState((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={pinConfirmModalState.onConfirm}
+        requiredPin={securityConfig.pinEnabled ? securityConfig.pin : undefined}
+        actionTitle={pinConfirmModalState.title}
+        actionDescription={pinConfirmModalState.description}
+        itemDetails={pinConfirmModalState.itemDetails}
+      />
 
       {/* Connectivity & Offline Status Indicator */}
       <OfflineIndicator />

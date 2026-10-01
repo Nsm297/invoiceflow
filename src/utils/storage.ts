@@ -16,17 +16,18 @@ export const INITIAL_CUSTOMERS: Customer[] = [];
 export const INITIAL_INVOICES: Invoice[] = [];
 
 /**
- * Completely clears all local and session user data on logout or account switch
+ * Clears transient session and cached invoice/customer data on logout,
+ * while preserving permanent user security configuration (pwa_pin_*, biometrics).
  */
 export const clearAllUserData = (): void => {
   try {
     localStorage.removeItem(STORAGE_KEY_CUSTOMERS);
     localStorage.removeItem(STORAGE_KEY_INVOICES);
     localStorage.removeItem(STORAGE_KEY_BUSINESS);
-    localStorage.removeItem('invoicegen_security_v1');
-    localStorage.removeItem('invoicegen_device_has_passkey');
+    // Security PIN and biometrics (pwa_pin_*) are permanently preserved
     if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.clear();
+      sessionStorage.removeItem('pwa_unlocked');
+      sessionStorage.removeItem('pwa_guest_mode');
     }
   } catch (err) {
     console.error('Error clearing user data:', err);

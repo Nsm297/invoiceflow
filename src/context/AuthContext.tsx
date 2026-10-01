@@ -6,14 +6,21 @@ import {
   logoutUser as firebaseLogoutUser,
   loginWithEmail as firebaseLoginWithEmail,
   registerWithEmail as firebaseRegisterWithEmail,
+  reauthenticateUserWithPassword as firebaseReauthenticateWithPassword,
+  reauthenticateUserWithGoogle as firebaseReauthenticateWithGoogle,
+  verifyUserCredentials as firebaseVerifyUserCredentials,
 } from '../firebase';
 
 export interface AuthContextType {
   user: User | null;
   loading: boolean;
+  isGoogleUser: boolean;
   loginWithGoogle: () => Promise<User | null>;
   loginWithEmail: (email: string, pass: string) => Promise<User | null>;
   registerWithEmail: (email: string, pass: string) => Promise<User | null>;
+  reauthenticateWithPassword: (pass: string) => Promise<boolean>;
+  reauthenticateWithGoogle: () => Promise<boolean>;
+  verifyCredentials: (email: string, pass: string) => Promise<boolean>;
   logout: () => Promise<void>;
   isInAppBrowser: boolean;
 }
@@ -21,9 +28,13 @@ export interface AuthContextType {
 export const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
+  isGoogleUser: false,
   loginWithGoogle: async () => null,
   loginWithEmail: async () => null,
   registerWithEmail: async () => null,
+  reauthenticateWithPassword: async () => false,
+  reauthenticateWithGoogle: async () => false,
+  verifyCredentials: async () => false,
   logout: async () => {},
   isInAppBrowser: false,
 });
@@ -56,6 +67,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
+  const isGoogleUser = Boolean(
+    user?.providerData?.some((p) => p.providerId === 'google.com')
+  );
+
   const loginWithGoogle = async (): Promise<User | null> => {
     return await firebaseLoginWithGoogle();
   };
@@ -68,6 +83,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return await firebaseRegisterWithEmail(email, pass);
   };
 
+  const reauthenticateWithPassword = async (pass: string): Promise<boolean> => {
+    return await firebaseReauthenticateWithPassword(pass);
+  };
+
+  const reauthenticateWithGoogle = async (): Promise<boolean> => {
+    return await firebaseReauthenticateWithGoogle();
+  };
+
+  const verifyCredentials = async (email: string, pass: string): Promise<boolean> => {
+    return await firebaseVerifyUserCredentials(email, pass);
+  };
+
   const logout = async (): Promise<void> => {
     await firebaseLogoutUser();
     setUser(null);
@@ -78,9 +105,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         loading,
+        isGoogleUser,
         loginWithGoogle,
         loginWithEmail,
         registerWithEmail,
+        reauthenticateWithPassword,
+        reauthenticateWithGoogle,
+        verifyCredentials,
         logout,
         isInAppBrowser,
       }}

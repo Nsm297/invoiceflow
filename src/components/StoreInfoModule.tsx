@@ -9,8 +9,9 @@ import {
   hasDevicePasskey,
 } from '../utils/security';
 import { PWAInstallButton } from './PWAInstallButton';
+import { ResetSecurityModal } from './ResetSecurityModal';
 
-interface StoreInfoModuleProps {
+export interface StoreInfoModuleProps {
   businessInfo: BusinessInfo;
   securityConfig: SecurityConfig;
   onSaveBusinessInfo: (info: BusinessInfo) => void;
@@ -59,6 +60,7 @@ export const StoreInfoModule: React.FC<StoreInfoModuleProps> = ({
   const [confirmPin, setConfirmPin] = useState('');
   const [currentPinInput, setCurrentPinInput] = useState('');
   const [securityMessage, setSecurityMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [showResetSecurityModal, setShowResetSecurityModal] = useState<boolean>(false);
 
   useEffect(() => {
     setName(businessInfo.name || '');
@@ -144,19 +146,8 @@ export const StoreInfoModule: React.FC<StoreInfoModuleProps> = ({
   };
 
   const handleDisablePin = () => {
-    if (window.confirm('Are you sure you want to disable PIN & Biometric security lock?')) {
-      const updatedConfig: SecurityConfig = {
-        pinEnabled: false,
-        pin: '',
-        biometricEnabled: false,
-        credentialId: undefined,
-      };
-      onSaveSecurityConfig(updatedConfig);
-      setCurrentPinInput('');
-      setNewPin('');
-      setConfirmPin('');
-      setSecurityMessage({ type: 'info', text: 'PIN lock disabled.' });
-    }
+    // Open password verification modal to ensure PIN cannot be disabled without authenticating
+    setShowResetSecurityModal(true);
   };
 
   const handleRegisterPasskey = async () => {
@@ -676,13 +667,24 @@ export const StoreInfoModule: React.FC<StoreInfoModuleProps> = ({
                       <span>Disable PIN Lock</span>
                     </button>
 
-                    <button
-                      type="submit"
-                      className="px-5 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm transition-all active:scale-[0.98] min-h-[38px] flex items-center gap-1.5"
-                    >
-                      <i className="fa-solid fa-arrows-rotate text-xs"></i>
-                      <span>Update Passcode PIN</span>
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowResetSecurityModal(true)}
+                        className="text-[11px] text-emerald-700 hover:text-emerald-800 font-semibold underline"
+                      >
+                        <i className="fa-solid fa-key mr-1"></i>
+                        Forgot Current PIN?
+                      </button>
+
+                      <button
+                        type="submit"
+                        className="px-5 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm transition-all active:scale-[0.98] min-h-[38px] flex items-center gap-1.5"
+                      >
+                        <i className="fa-solid fa-arrows-rotate text-xs"></i>
+                        <span>Update Passcode PIN</span>
+                      </button>
+                    </div>
                   </div>
                 </form>
 
@@ -1095,6 +1097,46 @@ export const StoreInfoModule: React.FC<StoreInfoModuleProps> = ({
           </div>
         </div>
       )}
+
+      {/* Firebase Password Re-authentication & Security Reset Modal */}
+      <ResetSecurityModal
+        isOpen={showResetSecurityModal}
+        onClose={() => setShowResetSecurityModal(false)}
+        onSuccess={(newPin) => {
+          if (newPin) {
+            const updatedConfig: SecurityConfig = {
+              ...securityConfig,
+              pin: newPin,
+              pinEnabled: true,
+            };
+            onSaveSecurityConfig(updatedConfig);
+            setCurrentPinInput('');
+            setNewPin('');
+            setConfirmPin('');
+            setSecurityMessage({
+              type: 'success',
+              text: 'Security credentials verified! 4-digit PIN updated.',
+            });
+          } else {
+            const updatedConfig: SecurityConfig = {
+              pinEnabled: false,
+              pin: '',
+              biometricEnabled: false,
+              credentialId: undefined,
+            };
+            onSaveSecurityConfig(updatedConfig);
+            setCurrentPinInput('');
+            setNewPin('');
+            setConfirmPin('');
+            setSecurityMessage({
+              type: 'info',
+              text: 'Security credentials verified! 4-digit PIN lock disabled.',
+            });
+          }
+        }}
+        title="Verify Identity to Modify Security"
+        description="Authenticate with your Firebase account password or Google account to authorize security modifications."
+      />
     </div>
   );
 };

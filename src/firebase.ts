@@ -7,10 +7,13 @@ import {
   browserLocalPersistence,
   browserPopupRedirectResolver,
   GoogleAuthProvider,
+  EmailAuthProvider,
   signInWithPopup,
   signInWithRedirect,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
   getRedirectResult,
   signOut,
   onAuthStateChanged,
@@ -23,7 +26,7 @@ import {
   setDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { Customer, Invoice, BusinessInfo } from './types/invoice';
+import { Customer, Invoice, BusinessInfo, SecurityConfig } from './types/invoice';
 
 // Direct Firebase credentials with env variable support and obfuscated fallback
 const defaultKey = typeof atob === 'function' ? atob('QUl6YVN5Q1dQMG0wZkZRZXNtRjFuVEFYaHowQUxrUGhYOWVOeVJr') : '';
@@ -140,20 +143,96 @@ export const checkRedirectLogin = async (): Promise<User | null> => {
 };
 
 /**
- * Sign out current user and clear all cached user data
+ * Sign out current user.
+ * Preserves permanent security settings (pwa_pin_*) and only clears active session flags.
  */
 export const logoutUser = async (): Promise<void> => {
   await signOut(auth);
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('invoicegen_customers_v2');
-    localStorage.removeItem('invoicegen_invoices_v2');
-    localStorage.removeItem('invoicegen_business_v2');
-    localStorage.removeItem('invoicegen_security_v1');
-    localStorage.removeItem('invoicegen_device_has_passkey');
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.clear();
-    }
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.removeItem('pwa_unlocked');
+    sessionStorage.removeItem('pwa_guest_mode');
   }
+};
+
+/**
+ * Re-authenticates the current user using their Firebase account password.
+ */
+export const reauthenticateUserWithPassword = async (password: string): Promise<boolean> => {
+  const currentUser = auth.currentUser;
+  if (!currentUser || !currentUser.email) {
+    throw new Error('No authenticated user with an email found.');
+  }
+
+  const credential = EmailAuthProvider.credential(currentUser.email, password);
+  await reauthenticateWithCredential(currentUser, credential);
+  return true;
+};
+
+/**
+ * Re-authenticates the current user with Google popup.
+ */
+export const reauthenticateUserWithGoogle = async (): Promise<boolean> => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('No authenticated user found.');
+  }
+
+  await reauthenticateWithPopup(currentUser, googleProvider, browserPopupRedirectResolver);
+  return true;
+};
+
+/**
+ * Verifies email and password credentials for an unauthenticated user or guest.
+ */
+export const verifyUserCredentials = async (email: string, pass: string): Promise<boolean> => {
+  const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
+  return Boolean(cred.user);
+};
+
+/**
+ * Persist security settings permanently under users/{uid}/settings/security in Firestore
+ */
+export const syncSecuritySettingsToFirestore = async (
+  uid: string,
+  config: SecurityConfig
+): Promise<void> => {
+  if (!uid) return;
+  try {
+    const docRef = doc(db, 'users', uid, 'settings', 'security');
+    await setDoc(
+      docRef,
+      {
+        pinEnabled: Boolean(config.pinEnabled),
+        pin: config.pin || '',
+        biometricEnabled: Boolean(config.biometricEnabled),
+        credentialId: config.credentialId || null,
+        autoLockOnIdle: Boolean(config.autoLockOnIdle),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('Could not sync security settings to Firestore:', err);
+  }
+};
+
+/**
+ * Fetch permanent security settings from Firestore under users/{uid}/settings/security
+ */
+export const fetchSecuritySettingsFromFirestore = async (
+  uid: string
+): Promise<Partial<SecurityConfig> | null> => {
+  if (!uid) return null;
+  try {
+    const docRef = doc(db, 'users', uid, 'settings', 'security');
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data() as Partial<SecurityConfig>;
+    }
+  } catch (err) {
+    console.warn('Could not fetch security settings from Firestore:', err);
+  }
+  return null;
 };
 
 /**
