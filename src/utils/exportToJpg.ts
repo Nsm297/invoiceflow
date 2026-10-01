@@ -3,9 +3,8 @@ import html2canvas from 'html2canvas';
 
 /**
  * Universal JPG Export Utility for InvoiceFlow
- * Dual-engine architecture:
- * 1. Primary Engine: html-to-image (fast, lightweight DOM snapshotting, zero-crash on mobile Chrome/WebViews)
- * 2. Fallback Engine: html2canvas with sanitized SVGs and explicit styles
+ * Ensures high-resolution, unclipped export on mobile devices by temporarily
+ * expanding the render container to 750px width and making table overflows visible.
  */
 export const downloadAsJpg = async (elementId: string, fileName: string): Promise<boolean> => {
   const target =
@@ -21,8 +20,28 @@ export const downloadAsJpg = async (elementId: string, fileName: string): Promis
 
   const cleanFileName = fileName.trim().replace(/[/\\?%*:|"<>]/g, '_');
 
+  // Save original styles for restoration
+  const originalWidth = target.style.width;
+  const originalMinWidth = target.style.minWidth;
+  const originalMaxWidth = target.style.maxWidth;
+  const originalOverflow = target.style.overflow;
+
+  // Find all internal scrollable table containers
+  const overflowContainers = target.querySelectorAll<HTMLElement>('.overflow-x-auto, .overflow-y-auto');
+  const originalOverflows: string[] = [];
+  overflowContainers.forEach((el, idx) => {
+    originalOverflows[idx] = el.style.overflow;
+    el.style.overflow = 'visible';
+  });
+
+  // Temporarily set fixed width of 750px to ensure full layout capture without horizontal clipping
+  target.style.width = '750px';
+  target.style.minWidth = '750px';
+  target.style.maxWidth = 'none';
+  target.style.overflow = 'visible';
+
   try {
-    // Allow browser frame to finish painting fonts & images
+    // Allow browser frame to finish painting fonts, layout shifts, & images
     await new Promise((res) => setTimeout(res, 350));
 
     // Primary Engine: html-to-image (Ultra-fast and zero-crash on mobile Chrome/Android WebViews)
@@ -30,11 +49,14 @@ export const downloadAsJpg = async (elementId: string, fileName: string): Promis
       const dataUrl = await toJpeg(target, {
         quality: 0.95,
         backgroundColor: '#ffffff',
+        width: 750,
         style: {
           transform: 'scale(1)',
           transformOrigin: 'top left',
-          width: `${target.offsetWidth}px`,
-          height: `${target.offsetHeight}px`,
+          width: '750px',
+          minWidth: '750px',
+          maxWidth: 'none',
+          overflow: 'visible',
         },
         filter: (node) => {
           // Exclude no-print buttons, print-hidden elements, or spinners
@@ -66,6 +88,8 @@ export const downloadAsJpg = async (elementId: string, fileName: string): Promis
     const scale = typeof window !== 'undefined' && window.innerWidth < 768 ? 1.5 : 2;
     const canvas = await html2canvas(target, {
       scale,
+      width: 750,
+      windowWidth: 750,
       useCORS: true,
       allowTaint: true,
       foreignObjectRendering: false,
@@ -87,7 +111,16 @@ export const downloadAsJpg = async (elementId: string, fileName: string): Promis
           clonedEl.style.visibility = 'visible';
           clonedEl.style.backgroundColor = '#ffffff';
           clonedEl.style.color = '#111827';
+          clonedEl.style.width = '750px';
+          clonedEl.style.minWidth = '750px';
+          clonedEl.style.maxWidth = 'none';
           clonedEl.style.minHeight = '300px';
+          clonedEl.style.overflow = 'visible';
+
+          const clonedOverflows = clonedEl.querySelectorAll<HTMLElement>('.overflow-x-auto, .overflow-y-auto');
+          clonedOverflows.forEach((el) => {
+            el.style.overflow = 'visible';
+          });
 
           // Convert all calculated text, bg, border, and gradient styles to standard RGB/HEX
           const allNodes = clonedEl.querySelectorAll('*');
@@ -144,6 +177,15 @@ export const downloadAsJpg = async (elementId: string, fileName: string): Promis
     console.error('JPG Export Error Details:', err);
     alert(`Export Error: ${err?.message || 'Could not generate image. Please try another theme.'}`);
     return false;
+  } finally {
+    // Restore original element layout styles after export completes
+    target.style.width = originalWidth;
+    target.style.minWidth = originalMinWidth;
+    target.style.maxWidth = originalMaxWidth;
+    target.style.overflow = originalOverflow;
+    overflowContainers.forEach((el, idx) => {
+      el.style.overflow = originalOverflows[idx] || '';
+    });
   }
 };
 

@@ -562,8 +562,8 @@ export const YearlyStatement: React.FC<YearlyStatementProps> = ({
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="overflow-x-auto print:overflow-visible">
+            <table className="w-full text-left border-collapse text-xs min-w-[650px]">
               <thead>
                 <tr className={`uppercase tracking-wider font-bold ${
                   selectedTemplate === 'elegant' ? 'bg-emerald-900 text-white text-[11px]' :
@@ -571,16 +571,16 @@ export const YearlyStatement: React.FC<YearlyStatementProps> = ({
                   selectedTemplate === 'compact' ? 'border-b border-dashed border-slate-600 text-slate-900 text-[10px]' :
                   'border-b-2 border-slate-300 bg-slate-100 text-[11px] text-slate-900'
                 }`}>
-                  <th className="py-2.5 px-3 sm:px-4 font-bold">Month</th>
+                  <th className="py-2.5 px-3 sm:px-4 font-bold w-28">Month</th>
                   <th className="py-2.5 px-3 sm:px-4 font-bold text-center w-20">Invoices</th>
-                  <th className="py-2.5 px-3 sm:px-4 text-right">
-                    Total Sales / Total Bill
+                  <th className="py-2.5 px-3 sm:px-4 text-right min-w-[130px]">
+                    Total Sales / Bill
                   </th>
-                  <th className="py-2.5 px-3 sm:px-4 text-right">
-                    Total Payment Received
+                  <th className="py-2.5 px-3 sm:px-4 text-right min-w-[130px]">
+                    Payment Received
                   </th>
-                  <th className="py-2.5 px-3 sm:px-4 text-right">
-                    Remaining Balance (Baqaya)
+                  <th className="py-2.5 px-3 sm:px-4 text-right min-w-[130px]">
+                    Remaining (Baqaya)
                   </th>
                 </tr>
               </thead>

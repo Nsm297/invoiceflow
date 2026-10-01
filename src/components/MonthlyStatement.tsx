@@ -575,8 +575,8 @@ export const MonthlyStatement: React.FC<MonthlyStatementProps> = ({
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+            <div className="overflow-x-auto print:overflow-visible">
+              <table className="w-full text-left border-collapse text-xs min-w-[650px]">
                 <thead>
                   <tr className={`uppercase tracking-wider font-bold ${
                     selectedTemplate === 'elegant' ? 'bg-emerald-900 text-white text-[11px]' :
@@ -584,19 +584,19 @@ export const MonthlyStatement: React.FC<MonthlyStatementProps> = ({
                     selectedTemplate === 'compact' ? 'border-b border-dashed border-slate-600 text-slate-900 text-[10px]' :
                     'border-b-2 border-slate-300 bg-slate-100 text-[11px] text-slate-900'
                   }`}>
-                    <th className="py-2.5 px-3">Invoice #</th>
-                    <th className="py-2.5 px-3">Date</th>
+                    <th className="py-2.5 px-3 w-24">Invoice #</th>
+                    <th className="py-2.5 px-3 w-24">Date</th>
                     <th className="py-2.5 px-3">Client Name</th>
-                    <th className="py-2.5 px-3 text-right">
-                      Total Bill (New Sale)
+                    <th className="py-2.5 px-3 text-right min-w-[110px]">
+                      Total Bill
                     </th>
-                    <th className="py-2.5 px-3 text-right">
+                    <th className="py-2.5 px-3 text-right min-w-[110px]">
                       Payment Received
                     </th>
-                    <th className="py-2.5 px-3 text-right">
-                      Remaining Balance (Baqaya)
+                    <th className="py-2.5 px-3 text-right min-w-[110px]">
+                      Remaining (Baqaya)
                     </th>
-                    <th className="py-2.5 px-3 text-center w-24 print:hidden">Action</th>
+                    <th className="py-2.5 px-3 text-center w-20 print:hidden">Action</th>
                   </tr>
                 </thead>
                 <tbody className={`divide-y ${selectedTemplate === 'compact' ? 'divide-dashed divide-slate-300 font-mono' : 'divide-slate-200 font-sans'}`}>

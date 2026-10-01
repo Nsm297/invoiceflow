@@ -576,8 +576,8 @@ _Generated via ${storeTitle} POS System_`;
             <div className={`rounded-xl overflow-hidden bg-white shadow-xs ${
               selectedTemplate === 'compact' ? 'border border-dashed border-slate-400' : 'border border-slate-300'
             }`}>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+              <div className="overflow-x-auto print:overflow-visible">
+                <table className="w-full text-left text-xs border-collapse min-w-[650px]">
                   <thead>
                     <tr className={`uppercase font-bold text-[11px] tracking-wider ${
                       selectedTemplate === 'elegant' ? 'bg-emerald-900 text-white' :
@@ -585,13 +585,13 @@ _Generated via ${storeTitle} POS System_`;
                       selectedTemplate === 'compact' ? 'border-b border-dashed border-slate-600 text-slate-900' :
                       'bg-slate-100 text-slate-900 border-b border-slate-300'
                     }`}>
-                      <th className="py-2.5 px-3">Date</th>
-                      <th className="py-2.5 px-3">Invoice #</th>
+                      <th className="py-2.5 px-3 w-24">Date</th>
+                      <th className="py-2.5 px-3 w-24">Invoice #</th>
                       <th className="py-2.5 px-3">Items / Notes</th>
-                      <th className="py-2.5 px-3 text-right">Bill Subtotal (Rs.)</th>
-                      <th className="py-2.5 px-3 text-right">Paid (Rs.)</th>
-                      <th className="py-2.5 px-3 text-right">Running Ledger (Rs.)</th>
-                      <th className="py-2.5 px-3 text-center print:hidden">Action</th>
+                      <th className="py-2.5 px-3 text-right min-w-[110px]">Bill Subtotal (Rs.)</th>
+                      <th className="py-2.5 px-3 text-right min-w-[100px]">Paid (Rs.)</th>
+                      <th className="py-2.5 px-3 text-right min-w-[110px]">Running Ledger (Rs.)</th>
+                      <th className="py-2.5 px-3 text-center w-20 print:hidden">Action</th>
                     </tr>
                   </thead>
                   <tbody className={`divide-y font-mono ${selectedTemplate === 'compact' ? 'divide-dashed divide-slate-300' : 'divide-slate-200'}`}>
