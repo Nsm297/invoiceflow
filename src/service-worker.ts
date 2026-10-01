@@ -1,4 +1,5 @@
-// InvoiceFlow PWA Service Worker
+/// <reference lib="webworker" />
+// InvoiceFlow PWA Service Worker (TypeScript)
 const CACHE_NAME = 'invoiceflow-cache-v1';
 const BASE_PATH = '/invoiceflow/';
 
@@ -13,8 +14,10 @@ const PRECACHE_ASSETS = [
   BASE_PATH + 'icon.svg'
 ];
 
-// Install Event - Precache critical assets
-self.addEventListener('install', (event) => {
+declare const self: ServiceWorkerGlobalScope;
+
+// Install Event - Precache critical assets & auto-update
+self.addEventListener('install', (event: ExtendableEvent) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -26,7 +29,7 @@ self.addEventListener('install', (event) => {
 });
 
 // Activate Event - Clean up stale caches and claim clients immediately
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', (event: ExtendableEvent) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
@@ -40,8 +43,8 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Event - Stale-while-revalidate for local assets & fonts
-self.addEventListener('fetch', (event) => {
+// Fetch Event - Bypass Firebase auth and secure token endpoints
+self.addEventListener('fetch', (event: FetchEvent) => {
   const request = event.request;
   const url = new URL(request.url);
 
@@ -116,3 +119,5 @@ self.addEventListener('fetch', (event) => {
     })()
   );
 });
+
+export {};

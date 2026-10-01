@@ -14,6 +14,7 @@ import {
 export interface AuthContextType {
   user: User | null;
   loading: boolean;
+  authLoading: boolean;
   isGoogleUser: boolean;
   loginWithGoogle: () => Promise<User | null>;
   loginWithEmail: (email: string, pass: string) => Promise<User | null>;
@@ -28,6 +29,7 @@ export interface AuthContextType {
 export const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
+  authLoading: true,
   isGoogleUser: false,
   loginWithGoogle: async () => null,
   loginWithEmail: async () => null,
@@ -54,16 +56,25 @@ export function detectInAppBrowser(): boolean {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [isInAppBrowser, setIsInAppBrowser] = useState<boolean>(false);
 
   useEffect(() => {
     setIsInAppBrowser(detectInAppBrowser());
 
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false); // Only set loading to false AFTER Firebase checks local session
+    // Firebase's onAuthStateChanged initially emits null while reading IndexedDB token on startup.
+    // We only resolve authLoading after the initial auth state is verified.
+    // CRITICAL: We do NOT clear localStorage, sessionStorage, or trigger signOut() when currentUser is null
+    // during onAuthStateChanged. Storage is only cleared when the user explicitly triggers logout().
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+      } else {
+        setUser(null);
+      }
+      setAuthLoading(false);
     });
+
     return () => unsubscribe();
   }, []);
 
@@ -104,7 +115,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
-        loading,
+        loading: authLoading,
+        authLoading,
         isGoogleUser,
         loginWithGoogle,
         loginWithEmail,
@@ -128,3 +140,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+

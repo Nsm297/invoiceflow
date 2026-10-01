@@ -43,7 +43,7 @@ export const firebaseConfig = {
 // Initialize Firebase App
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Configure Firebase Auth to strictly maintain local session persistence with browser popup/redirect resolver
+// Configure Firebase Auth to strictly maintain IndexedDB session persistence with browser popup/redirect resolver
 export const auth = (() => {
   try {
     return initializeAuth(app, {
@@ -91,7 +91,7 @@ export const registerWithEmail = async (email: string, pass: string): Promise<Us
  */
 export const loginWithGoogle = async (): Promise<User | null> => {
   try {
-    await setPersistence(auth, browserLocalPersistence);
+    await setPersistence(auth, indexedDBLocalPersistence);
   } catch (pErr) {
     console.warn('Could not set persistence before popup login:', pErr);
   }
