@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth';
+import { User, onIdTokenChanged } from 'firebase/auth';
 import {
   auth,
   loginWithGoogle as firebaseLoginWithGoogle,
@@ -62,16 +62,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     setIsInAppBrowser(detectInAppBrowser());
 
-    // Firebase's onAuthStateChanged initially emits null while reading IndexedDB token on startup.
-    // We only resolve authLoading after the initial auth state is verified.
-    // CRITICAL: We do NOT clear localStorage, sessionStorage, or trigger signOut() when currentUser is null
-    // during onAuthStateChanged. Storage is only cleared when the user explicitly triggers logout().
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-      } else {
-        setUser(null);
-      }
+    // Switch from onAuthStateChanged to onIdTokenChanged to handle silent token refreshes
+    // in background/mobile PWA without logging the user out.
+    // CRITICAL: Never call signOut() or clear localStorage/sessionStorage automatically on startup
+    // when currentUser is null. Session data must ONLY be cleared inside explicit user-initiated logout().
+    const unsubscribe = onIdTokenChanged(auth, (currentUser) => {
+      setUser(currentUser);
       setAuthLoading(false);
     });
 
@@ -140,4 +136,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-

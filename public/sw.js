@@ -40,13 +40,13 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Event - Stale-while-revalidate for local assets & fonts
+// Fetch Event - Stale-while-revalidate for local assets & fonts; Network Only for Firebase/Auth
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  // Strictly bypass Firebase Auth, Token, Firestore and Google API endpoints
-  // NEVER cache or intercept identitytoolkit.googleapis.com or securetoken.googleapis.com
+  // Strictly bypass Firebase Auth endpoints, Token refresh, Firestore, and Google API endpoints
+  // NEVER cache or intercept identitytoolkit.googleapis.com, securetoken.googleapis.com, or *.firebaseapp.com
   if (
     request.method !== 'GET' ||
     url.hostname === 'identitytoolkit.googleapis.com' ||
@@ -58,10 +58,11 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('googleapis.com') ||
     url.hostname.includes('accounts.google.com') ||
     url.hostname.includes('firebaseapp.com') ||
+    url.hostname.includes('firebasestorage.app') ||
     url.pathname.includes('/v1/accounts') ||
     url.pathname.includes('/v1/token')
   ) {
-    return; // Direct network passthrough
+    return; // Direct network passthrough (Network Only strategy)
   }
 
   // Handle CDN / Fonts (CacheFirst)

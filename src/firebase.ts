@@ -1,10 +1,9 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
-  initializeAuth,
   getAuth,
   setPersistence,
-  indexedDBLocalPersistence,
   browserLocalPersistence,
+  indexedDBLocalPersistence,
   browserPopupRedirectResolver,
   GoogleAuthProvider,
   EmailAuthProvider,
@@ -16,7 +15,7 @@ import {
   reauthenticateWithPopup,
   getRedirectResult,
   signOut,
-  onAuthStateChanged,
+  onIdTokenChanged,
   User,
 } from 'firebase/auth';
 import {
@@ -43,17 +42,15 @@ export const firebaseConfig = {
 // Initialize Firebase App
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Configure Firebase Auth to strictly maintain IndexedDB session persistence with browser popup/redirect resolver
-export const auth = (() => {
-  try {
-    return initializeAuth(app, {
-      persistence: [indexedDBLocalPersistence, browserLocalPersistence],
-      popupRedirectResolver: browserPopupRedirectResolver,
-    });
-  } catch {
-    return getAuth(app);
-  }
-})();
+// Configure Firebase Auth with explicit LocalStorage persistence so sessions survive mobile PWA restarts & backgrounding
+export const auth = getAuth(app);
+
+// Force LocalStorage persistence as primary, falling back to IndexedDB if unavailable
+setPersistence(auth, browserLocalPersistence).catch(() => {
+  setPersistence(auth, indexedDBLocalPersistence).catch((err) => {
+    console.warn('Firebase persistence initialization warning:', err);
+  });
+});
 
 export const db = getFirestore(app);
 
@@ -91,9 +88,9 @@ export const registerWithEmail = async (email: string, pass: string): Promise<Us
  */
 export const loginWithGoogle = async (): Promise<User | null> => {
   try {
-    await setPersistence(auth, indexedDBLocalPersistence);
+    await setPersistence(auth, browserLocalPersistence);
   } catch (pErr) {
-    console.warn('Could not set persistence before popup login:', pErr);
+    console.warn('Could not set LocalStorage persistence before popup login:', pErr);
   }
 
   try {

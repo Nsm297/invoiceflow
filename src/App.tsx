@@ -658,7 +658,7 @@ function MainApp() {
           <div className="w-8 h-8 border-3 border-emerald-400 border-t-transparent rounded-full animate-spin mb-3"></div>
           <h2 className="text-xl font-black tracking-tight text-white">InvoiceFlow</h2>
           <p className="text-xs text-emerald-400 font-medium tracking-wide mt-1">
-            Restoring your secure session from IndexedDB...
+            Restoring session...
           </p>
         </div>
       </div>

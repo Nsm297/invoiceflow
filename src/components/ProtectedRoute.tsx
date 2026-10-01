@@ -9,9 +9,8 @@ interface ProtectedRouteProps {
 
 /**
  * ProtectedRoute component that enforces authentication:
- * DO NOT render fallback or redirect while authLoading is true.
- * Renders a full-screen loading splash screen until onAuthStateChanged finishes reading IndexedDB.
- * Strict Guard: Unauthenticated users are shown the Login screen.
+ * Block route redirects and login component until onIdTokenChanged auth check completes (authLoading === false).
+ * Renders a clean splash/loading screen ("Restoring session...") while authLoading is true.
  */
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, fallback }) => {
   const { user, loading, authLoading } = useAuth();
@@ -30,7 +29,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, fallba
         <div className="w-8 h-8 border-3 border-emerald-400 border-t-transparent rounded-full animate-spin mb-3"></div>
         <h2 className="text-lg font-black tracking-tight text-white">InvoiceFlow</h2>
         <p className="text-xs text-emerald-400/90 font-medium tracking-wide mt-1">
-          Restoring your secure session from IndexedDB...
+          Restoring session...
         </p>
       </div>
     );
@@ -42,4 +41,3 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, fallba
 
   return <>{children}</>;
 };
-
