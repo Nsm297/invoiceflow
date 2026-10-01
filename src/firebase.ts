@@ -150,7 +150,6 @@ export const logoutUser = async (): Promise<void> => {
   await signOut(auth);
   if (typeof sessionStorage !== 'undefined') {
     sessionStorage.removeItem('pwa_unlocked');
-    sessionStorage.removeItem('pwa_guest_mode');
   }
 };
 
@@ -182,7 +181,7 @@ export const reauthenticateUserWithGoogle = async (): Promise<boolean> => {
 };
 
 /**
- * Verifies email and password credentials for an unauthenticated user or guest.
+ * Verifies email and password credentials for an unauthenticated user.
  */
 export const verifyUserCredentials = async (email: string, pass: string): Promise<boolean> => {
   const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);

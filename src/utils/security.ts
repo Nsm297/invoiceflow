@@ -26,11 +26,11 @@ export {
 const STORAGE_KEY_SECURITY = 'invoicegen_security_v1';
 
 export const getUserPinKey = (uid?: string | null): string => {
-  return uid ? `pwa_pin_${uid}` : 'pwa_pin_guest';
+  return uid ? `pwa_pin_${uid}` : 'pwa_pin_default';
 };
 
 export const getUserBioKey = (uid?: string | null): string => {
-  return uid ? `pwa_bio_enabled_${uid}` : 'pwa_bio_enabled_guest';
+  return uid ? `pwa_bio_enabled_${uid}` : 'pwa_bio_enabled_default';
 };
 
 export const DEFAULT_SECURITY_CONFIG: SecurityConfig = {

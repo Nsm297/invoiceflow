@@ -3,10 +3,9 @@ import { useAuth } from '../context/AuthContext';
 
 interface LoginProps {
   onSuccess?: () => void;
-  onContinueAsGuest?: () => void;
 }
 
-export const Login: React.FC<LoginProps> = ({ onSuccess, onContinueAsGuest }) => {
+export const Login: React.FC<LoginProps> = ({ onSuccess }) => {
   const { loginWithEmail, registerWithEmail, loginWithGoogle } = useAuth();
 
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -364,20 +363,6 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, onContinueAsGuest }) =>
               </>
             )}
           </button>
-
-          {/* Continue Offline / Guest Mode */}
-          {onContinueAsGuest && (
-            <div className="mt-4 pt-3 text-center">
-              <button
-                type="button"
-                onClick={onContinueAsGuest}
-                className="text-xs text-slate-500 hover:text-slate-800 underline font-medium transition-colors"
-                title="Use local device storage without cloud account"
-              >
-                Continue in Offline / Guest Mode
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Footer Note */}

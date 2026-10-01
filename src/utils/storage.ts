@@ -27,7 +27,6 @@ export const clearAllUserData = (): void => {
     // Security PIN and biometrics (pwa_pin_*) are permanently preserved
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.removeItem('pwa_unlocked');
-      sessionStorage.removeItem('pwa_guest_mode');
     }
   } catch (err) {
     console.error('Error clearing user data:', err);

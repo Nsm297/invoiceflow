@@ -59,14 +59,6 @@ function MainApp() {
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo>(getStoredBusinessInfo());
   const [securityConfig, setSecurityConfig] = useState<SecurityConfig>(getStoredSecurityConfig());
 
-  // Guest / Offline Mode Flag
-  const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
-    if (typeof sessionStorage !== 'undefined') {
-      return sessionStorage.getItem('pwa_guest_mode') === 'true';
-    }
-    return false;
-  });
-
   // Cloud Sync States
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
@@ -266,10 +258,6 @@ function MainApp() {
       showToast('info', 'Connecting to Google...', 'Opening Google Authentication popup.');
       const user = await loginWithGoogle();
       if (user) {
-        if (typeof sessionStorage !== 'undefined') {
-          sessionStorage.removeItem('pwa_guest_mode');
-        }
-        setIsGuestMode(false);
         showToast('success', 'Signed In', `Welcome ${user.displayName || user.email}!`);
       }
     } catch (err: any) {
@@ -287,10 +275,7 @@ function MainApp() {
   };
 
   const handleOpenLoginScreen = () => {
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.removeItem('pwa_guest_mode');
-    }
-    setIsGuestMode(false);
+    // Navigates to Login
   };
 
   const handleGoogleSignOut = async () => {
@@ -300,9 +285,7 @@ function MainApp() {
       clearAllUserData();
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.removeItem('pwa_unlocked');
-        sessionStorage.removeItem('pwa_guest_mode');
       }
-      setIsGuestMode(false);
       setCustomers([]);
       setInvoices([]);
       setBusinessInfo(DEFAULT_BUSINESS_INFO);
@@ -651,45 +634,59 @@ function MainApp() {
     });
   };
 
+  // ==========================================
+  // ROUTE FLOW LOGIC ENFORCEMENT (States A, B, C, D)
+  // ==========================================
+
+  // State A (authLoading === true): Show Full-Screen Splash / Loading Screen
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <h2 className="text-base font-bold text-slate-800">InvoiceFlow</h2>
-        <p className="text-xs text-slate-500 mt-1">Restoring your secure session...</p>
+      <div className="fixed inset-0 z-50 min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white selection:bg-emerald-500 selection:text-white">
+        {/* Ambient glow */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-25">
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-500/30 rounded-full blur-3xl"></div>
+        </div>
+
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-emerald-400 text-white flex items-center justify-center text-2xl shadow-xl shadow-emerald-950 mb-4 border border-emerald-300/30">
+            <i className="fa-solid fa-file-invoice"></i>
+            <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500"></span>
+            </span>
+          </div>
+          <div className="w-8 h-8 border-3 border-emerald-400 border-t-transparent rounded-full animate-spin mb-3"></div>
+          <h2 className="text-xl font-black tracking-tight text-white">InvoiceFlow</h2>
+          <p className="text-xs text-emerald-400 font-medium tracking-wide mt-1">
+            Restoring your secure session from IndexedDB...
+          </p>
+        </div>
       </div>
     );
   }
 
-  // 0. Standard Email & Password Login Screen for unauthenticated users and after logout
-  if (!currentUser && !isGuestMode) {
+  // State D (user === null AND authLoading === false): ONLY in this case show the Email/Password Login Screen
+  // Every single route requires an authenticated Firebase user (mandatory authentication)
+  if (!currentUser) {
     return (
       <>
         <ToastContainer toasts={toasts} onDismiss={handleDismissToast} />
         <InAppBrowserWarning />
         <Login
           onSuccess={() => {
-            if (typeof sessionStorage !== 'undefined') {
-              sessionStorage.removeItem('pwa_guest_mode');
-            }
-            setIsGuestMode(false);
             showToast('success', 'Logged In', 'Welcome to InvoiceFlow!');
-          }}
-          onContinueAsGuest={() => {
-            if (typeof sessionStorage !== 'undefined') {
-              sessionStorage.setItem('pwa_guest_mode', 'true');
-            }
-            setIsGuestMode(true);
-            showToast('info', 'Offline / Guest Mode', 'Operating locally with device storage.');
           }}
         />
       </>
     );
   }
 
+  // State B & C (user !== null):
+  // If LockScreen is active, render SecurityLockScreen (Fingerprint / 4-digit PIN)
+  // Otherwise render Dashboard / App Main View (State C)
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
-      {/* 1. Security Lock Screen Overlay */}
+      {/* State B: Security Lock Screen (Fingerprint / 4-Digit PIN) */}
       {isLocked && securityConfig.pinEnabled && (
         <SecurityLockScreen
           businessInfo={businessInfo}
