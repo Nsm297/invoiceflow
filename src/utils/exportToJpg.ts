@@ -4,50 +4,44 @@ import html2canvas from 'html2canvas';
  * Universal JPG Export Utility for InvoiceFlow
  * Exports specified DOM element ID as high-resolution crisp JPG image.
  * 
- * Features:
- * - 300ms frame paint wait for clean rendering
- * - Off-screen safety & explicit visibility enforcement
- * - CSS sanitization to eliminate unsupported oklch color parsing locks
- * - CORS image support and high-contrast color fallbacks
- * - Strict try...catch...finally state cleanup
+ * Includes optimizations for mobile canvas memory limits, CSS sanitization,
+ * and reliable frame painting.
  */
-export const exportToJpg = async (elementId: string, filename: string): Promise<boolean> => {
-  const targetEl = document.getElementById(elementId);
-  if (!targetEl) {
-    const errorMsg = `Render element "#${elementId}" not found in document!`;
-    console.error(`[exportToJpg] ${errorMsg}`);
-    alert('Render element not found! Please ensure the report preview is open.');
+export const downloadAsJpg = async (elementId: string, fileName: string): Promise<boolean> => {
+  const element = document.getElementById(elementId);
+  if (!element) {
+    console.error(`Element with id ${elementId} not found.`);
+    alert('Report template element not found. Please try again.');
     return false;
   }
 
   try {
-    // 1. Allow browser frame to finish painting images, fonts, and sub-components
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    // 1. Allow browser frame to finish painting fonts & images
+    await new Promise((resolve) => setTimeout(resolve, 350));
 
-    // 2. High DPI capture with CORS and OKLCH color sanitization
-    const canvas = await html2canvas(targetEl, {
-      scale: 2,
+    // 2. Dynamic scale calculation to prevent mobile browser canvas memory crashes
+    const scale = typeof window !== 'undefined' && window.innerWidth < 768 ? 1.5 : 2;
+
+    const canvas = await html2canvas(element, {
+      scale,
       useCORS: true,
       allowTaint: true,
+      foreignObjectRendering: false,
       backgroundColor: '#ffffff',
-      logging: true, // Enable debug log in browser console
+      logging: false,
       onclone: (clonedDoc) => {
-        const el = clonedDoc.getElementById(elementId);
-        if (el) {
-          // Force element visibility and layout geometry
-          el.style.display = 'block';
-          el.style.visibility = 'visible';
-          el.style.backgroundColor = '#ffffff';
-          el.style.color = '#111827';
-          el.style.opacity = '1';
+        const clonedEl = clonedDoc.getElementById(elementId);
+        if (clonedEl) {
+          clonedEl.style.display = 'block';
+          clonedEl.style.visibility = 'visible';
+          clonedEl.style.backgroundColor = '#ffffff';
 
-          // Force standard color fallbacks and fonts to prevent oklch parsing locks
-          const allElements = el.querySelectorAll('*');
-          allElements.forEach((node: any) => {
+          // Fallback fonts & styles to prevent CSS parsing locks / oklch issues
+          const nodes = clonedEl.querySelectorAll('*');
+          nodes.forEach((node: any) => {
             if (node.style) {
-              node.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
-              
-              // Clean any oklch color values that cause html2canvas infinite hang
+              node.style.fontFamily = 'sans-serif';
+
               try {
                 const computed = clonedDoc.defaultView?.getComputedStyle(node);
                 if (computed) {
@@ -62,7 +56,7 @@ export const exportToJpg = async (elementId: string, filename: string): Promise<
                   }
                 }
               } catch {
-                // Ignore computed style errors
+                // Ignore style read issues on cloned nodes
               }
             }
           });
@@ -70,11 +64,10 @@ export const exportToJpg = async (elementId: string, filename: string): Promise<
       },
     });
 
-    // 3. Convert to high-quality JPEG and trigger browser download
-    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    const image = canvas.toDataURL('image/jpeg', 0.90);
     const link = document.createElement('a');
-    link.href = imgData;
-    const cleanFileName = filename.trim().replace(/[/\\?%*:|"<>]/g, '_');
+    link.href = image;
+    const cleanFileName = fileName.trim().replace(/[/\\?%*:|"<>]/g, '_');
     link.download = `${cleanFileName}.jpg`;
     document.body.appendChild(link);
     link.click();
@@ -90,4 +83,4 @@ export const exportToJpg = async (elementId: string, filename: string): Promise<
 /**
  * Universal Alias for exportToJpg
  */
-export const downloadAsJpg = exportToJpg;
+export const exportToJpg = downloadAsJpg;

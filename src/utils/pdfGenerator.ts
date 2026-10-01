@@ -273,14 +273,17 @@ export async function captureInvoiceCanvas(
     element.style.setProperty('color', '#000000', 'important');
 
     // Allow browser frame to finish painting fonts and images
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 350));
+
+    const scale = typeof window !== 'undefined' && window.innerWidth < 768 ? 1.5 : 2;
 
     const canvas = await html2canvas(element, {
-      scale: 2,
+      scale,
       useCORS: true,
       allowTaint: true,
+      foreignObjectRendering: false,
       backgroundColor: '#ffffff',
-      logging: true,
+      logging: false,
       onclone: (clonedDoc) => {
         const win = clonedDoc.defaultView || window;
         // Ensure element is visible and strip/convert unsupported oklch color functions
