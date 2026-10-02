@@ -1,5 +1,5 @@
 // InvoiceFlow PWA Service Worker
-const CACHE_NAME = 'invoiceflow-cache-v1';
+const CACHE_NAME = 'invoiceflow-cache-v2';
 const BASE_PATH = '/invoiceflow/';
 
 const PRECACHE_ASSETS = [
@@ -43,34 +43,33 @@ self.addEventListener('activate', (event) => {
 // Fetch Event - Stale-while-revalidate for local assets & fonts; Network Only for Firebase/Auth
 self.addEventListener('fetch', (event) => {
   const request = event.request;
-  const url = new URL(request.url);
+  const url = request.url;
 
-  // Strictly bypass Firebase Auth endpoints, Token refresh, Firestore, and Google API endpoints
-  // NEVER cache or intercept identitytoolkit.googleapis.com, securetoken.googleapis.com, or *.firebaseapp.com
+  // Strictly bypass Service Worker for Firebase Auth token refresh & API calls
   if (
-    request.method !== 'GET' ||
-    url.hostname === 'identitytoolkit.googleapis.com' ||
-    url.hostname === 'securetoken.googleapis.com' ||
-    url.hostname.includes('identitytoolkit.googleapis.com') ||
-    url.hostname.includes('securetoken.googleapis.com') ||
-    url.hostname.includes('firestore.googleapis.com') ||
-    url.hostname.includes('firebaseinstallations.googleapis.com') ||
-    url.hostname.includes('googleapis.com') ||
-    url.hostname.includes('accounts.google.com') ||
-    url.hostname.includes('firebaseapp.com') ||
-    url.hostname.includes('firebasestorage.app') ||
-    url.pathname.includes('/v1/accounts') ||
-    url.pathname.includes('/v1/token')
+    url.includes('identitytoolkit.googleapis.com') ||
+    url.includes('securetoken.googleapis.com') ||
+    url.includes('firebaseinstallations.googleapis.com') ||
+    url.includes('firestore.googleapis.com') ||
+    url.includes('accounts.google.com') ||
+    url.includes('firebaseapp.com') ||
+    url.includes('googleapis.com') ||
+    url.includes('firebasestorage.app')
   ) {
-    return; // Direct network passthrough (Network Only strategy)
+    return; // Let browser fetch directly from network
+  }
+
+  // Non-GET requests pass directly to network
+  if (request.method !== 'GET') {
+    return;
   }
 
   // Handle CDN / Fonts (CacheFirst)
   if (
-    url.origin.includes('fonts.googleapis.com') ||
-    url.origin.includes('fonts.gstatic.com') ||
-    url.origin.includes('cdnjs.cloudflare.com') ||
-    url.origin.includes('cdn.tailwindcss.com')
+    url.includes('fonts.googleapis.com') ||
+    url.includes('fonts.gstatic.com') ||
+    url.includes('cdnjs.cloudflare.com') ||
+    url.includes('cdn.tailwindcss.com')
   ) {
     event.respondWith(
       (async () => {

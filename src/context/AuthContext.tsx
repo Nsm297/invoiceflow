@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth';
+import { User, onIdTokenChanged } from 'firebase/auth';
 import {
   auth,
   loginWithGoogle as firebaseLoginWithGoogle,
@@ -62,15 +62,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     setIsInAppBrowser(detectInAppBrowser());
 
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onIdTokenChanged(auth, async (currentUser) => {
       if (currentUser) {
-        setUser(currentUser);
         try {
-          localStorage.setItem('has_active_session', 'true');
-        } catch {}
+          // Validate token without throwing unhandled exceptions or triggering logout
+          await currentUser.getIdToken(/* forceRefresh */ false);
+          setUser(currentUser);
+          try {
+            localStorage.setItem('has_active_session', 'true');
+          } catch {}
+        } catch (err) {
+          console.warn('Token refresh network issue, retaining local session state:', err);
+          // Keep local user state if session marker exists, do NOT sign out on transient network error
+          const hasSession = typeof localStorage !== 'undefined' && localStorage.getItem('has_active_session') === 'true';
+          if (hasSession) {
+            setUser(currentUser);
+          }
+        }
       } else {
-        setUser(null);
-        // Only clear session marker if user explicitly clicked logout
+        // Only clear user state if no active session marker exists
+        const hasSession = typeof localStorage !== 'undefined' && localStorage.getItem('has_active_session') === 'true';
+        if (!hasSession) {
+          setUser(null);
+        }
       }
       setLoading(false);
     });
