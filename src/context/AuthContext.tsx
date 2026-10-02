@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, onIdTokenChanged } from 'firebase/auth';
+import { User, onAuthStateChanged } from 'firebase/auth';
 import {
   auth,
   loginWithGoogle as firebaseLoginWithGoogle,
@@ -62,34 +62,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     setIsInAppBrowser(detectInAppBrowser());
 
-    const unsubscribe = onIdTokenChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        try {
-          // Validate token without throwing unhandled exceptions or triggering logout
-          await currentUser.getIdToken(/* forceRefresh */ false);
+    // 4-second safety net to force loading completion and prevent infinite spinner
+    const safetyTimeout = setTimeout(() => {
+      setLoading((prevLoading) => {
+        if (prevLoading) {
+          console.warn('Auth check timed out, unblocking UI...');
+          return false;
+        }
+        return false;
+      });
+    }, 4000);
+
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (currentUser) => {
+        clearTimeout(safetyTimeout);
+        if (currentUser) {
           setUser(currentUser);
           try {
             localStorage.setItem('has_active_session', 'true');
           } catch {}
-        } catch (err) {
-          console.warn('Token refresh network issue, retaining local session state:', err);
-          // Keep local user state if session marker exists, do NOT sign out on transient network error
-          const hasSession = typeof localStorage !== 'undefined' && localStorage.getItem('has_active_session') === 'true';
-          if (hasSession) {
-            setUser(currentUser);
-          }
-        }
-      } else {
-        // Only clear user state if no active session marker exists
-        const hasSession = typeof localStorage !== 'undefined' && localStorage.getItem('has_active_session') === 'true';
-        if (!hasSession) {
+        } else {
           setUser(null);
+          try {
+            localStorage.removeItem('has_active_session');
+          } catch {}
         }
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Auth Listener Error:', error);
+        clearTimeout(safetyTimeout);
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    );
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(safetyTimeout);
+      unsubscribe();
+    };
   }, []);
 
   const isGoogleUser = Boolean(

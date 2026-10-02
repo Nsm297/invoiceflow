@@ -10,9 +10,8 @@ interface ProtectedRouteProps {
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, fallback }) => {
   const { user, loading, authLoading } = useAuth();
   const isLoading = authLoading ?? loading;
-  const hasSession = typeof localStorage !== 'undefined' && localStorage.getItem('has_active_session') === 'true';
 
-  if (isLoading || (hasSession && !user)) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
         <div className="text-center">
@@ -23,7 +22,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, fallba
     );
   }
 
-  if (!user && !hasSession) {
+  if (!user) {
     return fallback ? <>{fallback}</> : <Login />;
   }
 

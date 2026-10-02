@@ -638,11 +638,8 @@ function MainApp() {
   // ROUTE FLOW LOGIC ENFORCEMENT (States A, B, C, D)
   // ==========================================
 
-  // Check active session marker in localStorage to prevent premature login screen on refresh
-  const hasSession = typeof localStorage !== 'undefined' && localStorage.getItem('has_active_session') === 'true';
-
-  // State A: Show Session Verification Screen while auth is loading or active session is being restored
-  if (authLoading || (hasSession && !currentUser)) {
+  // State A: Show Session Verification Screen ONLY while authLoading is strictly true
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
         <div className="text-center">
@@ -653,7 +650,7 @@ function MainApp() {
     );
   }
 
-  // State D (user === null AND authLoading === false AND !hasSession): ONLY in this case show the Email/Password Login Screen
+  // State D (user === null AND authLoading === false): Show the Email/Password Login Screen
   // Every single route requires an authenticated Firebase user (mandatory authentication)
   if (!currentUser) {
     return (
