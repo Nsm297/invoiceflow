@@ -40,19 +40,18 @@ export const firebaseConfig = {
   appId: "1:746068664458:web:0d8a81e9412c4693778d73"
 };
 
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Synchronous auth initialization with fallback persistence array:
-// browserLocalPersistence (LocalStorage) first, indexedDBLocalPersistence second
-export const auth = (() => {
-  try {
-    return initializeAuth(app, {
-      persistence: [browserLocalPersistence, indexedDBLocalPersistence],
-    });
-  } catch {
-    return getAuth(app);
-  }
-})();
+let auth: ReturnType<typeof getAuth>;
+try {
+  auth = initializeAuth(app, {
+    persistence: [browserLocalPersistence, indexedDBLocalPersistence],
+  });
+} catch (e) {
+  auth = getAuth(app);
+}
+
+export { auth };
 
 export const db = getFirestore(app);
 
@@ -76,6 +75,13 @@ export const loginWithEmail = async (email: string, pass: string): Promise<User 
   const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
   if (cred.user) {
     try {
+      const sessionData = {
+        uid: cred.user.uid,
+        email: cred.user.email,
+        displayName: cred.user.displayName,
+        photoURL: cred.user.photoURL,
+      };
+      localStorage.setItem('invoiceflow_user_session', JSON.stringify(sessionData));
       localStorage.setItem('app_user_uid', cred.user.uid);
       localStorage.setItem('has_active_session', 'true');
     } catch {}
@@ -90,6 +96,13 @@ export const registerWithEmail = async (email: string, pass: string): Promise<Us
   const cred = await createUserWithEmailAndPassword(auth, email.trim(), pass);
   if (cred.user) {
     try {
+      const sessionData = {
+        uid: cred.user.uid,
+        email: cred.user.email,
+        displayName: cred.user.displayName,
+        photoURL: cred.user.photoURL,
+      };
+      localStorage.setItem('invoiceflow_user_session', JSON.stringify(sessionData));
       localStorage.setItem('app_user_uid', cred.user.uid);
       localStorage.setItem('has_active_session', 'true');
     } catch {}
@@ -105,6 +118,13 @@ export const loginWithGoogle = async (): Promise<User | null> => {
     const result = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
     if (result.user) {
       try {
+        const sessionData = {
+          uid: result.user.uid,
+          email: result.user.email,
+          displayName: result.user.displayName,
+          photoURL: result.user.photoURL,
+        };
+        localStorage.setItem('invoiceflow_user_session', JSON.stringify(sessionData));
         localStorage.setItem('app_user_uid', result.user.uid);
         localStorage.setItem('has_active_session', 'true');
       } catch {}
@@ -140,6 +160,13 @@ export const checkRedirectLogin = async (): Promise<User | null> => {
     const result = await getRedirectResult(auth, browserPopupRedirectResolver);
     if (result?.user) {
       try {
+        const sessionData = {
+          uid: result.user.uid,
+          email: result.user.email,
+          displayName: result.user.displayName,
+          photoURL: result.user.photoURL,
+        };
+        localStorage.setItem('invoiceflow_user_session', JSON.stringify(sessionData));
         localStorage.setItem('app_user_uid', result.user.uid);
         localStorage.setItem('has_active_session', 'true');
       } catch {}
@@ -164,6 +191,7 @@ export const checkRedirectLogin = async (): Promise<User | null> => {
  */
 export const logoutUser = async (): Promise<void> => {
   try {
+    localStorage.removeItem('invoiceflow_user_session');
     localStorage.removeItem('app_user_uid');
     localStorage.removeItem('has_active_session');
   } catch {}

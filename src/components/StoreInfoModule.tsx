@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User } from 'firebase/auth';
+import { AuthUser } from '../context/AuthContext';
 import { BusinessInfo, SecurityConfig } from '../types/invoice';
 import { DEFAULT_BUSINESS_INFO } from '../utils/storage';
 import {
@@ -18,7 +18,7 @@ export interface StoreInfoModuleProps {
   onSaveSecurityConfig: (config: SecurityConfig) => void;
   onNavigateToCreate: () => void;
   onLockApp: () => void;
-  user: User | null;
+  user: AuthUser | null;
   authLoading?: boolean;
   isSyncing?: boolean;
   lastSyncedTime?: string | null;

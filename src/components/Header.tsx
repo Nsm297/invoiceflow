@@ -1,5 +1,5 @@
 import React from 'react';
-import { User } from 'firebase/auth';
+import { AuthUser } from '../context/AuthContext';
 import { TabType } from '../types/invoice';
 import { PWAInstallButton } from './PWAInstallButton';
 
@@ -11,7 +11,7 @@ interface HeaderProps {
   customersCount: number;
   pinEnabled?: boolean;
   onLockApp?: () => void;
-  user: User | null;
+  user: AuthUser | null;
   authLoading?: boolean;
   isSyncing?: boolean;
   onGoogleSignIn: () => void;

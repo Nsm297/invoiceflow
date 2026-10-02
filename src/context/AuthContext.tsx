@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, onIdTokenChanged } from 'firebase/auth';
+import { User } from 'firebase/auth';
 import {
   auth,
   loginWithGoogle as firebaseLoginWithGoogle,
@@ -11,8 +11,18 @@ import {
   verifyUserCredentials as firebaseVerifyUserCredentials,
 } from '../firebase';
 
+export interface StoredUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL?: string | null;
+  providerData?: any[];
+}
+
+export type AuthUser = User | StoredUser;
+
 export interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   loading: boolean;
   authLoading: boolean;
   isGoogleUser: boolean;
@@ -55,8 +65,26 @@ export function detectInAppBrowser(): boolean {
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  // 1. Initial State read from LocalStorage FIRST (Instant Load)
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    if (typeof localStorage === 'undefined') return null;
+    try {
+      const saved = localStorage.getItem('invoiceflow_user_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (typeof localStorage === 'undefined') return true;
+    try {
+      return !localStorage.getItem('invoiceflow_user_session');
+    } catch {
+      return true;
+    }
+  });
+
   const [isInAppBrowser, setIsInAppBrowser] = useState<boolean>(false);
 
   useEffect(() => {
@@ -64,45 +92,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 4-second safety net to force loading completion and prevent infinite spinner
     const safetyTimeout = setTimeout(() => {
-      setLoading((prevLoading) => {
-        if (prevLoading) {
-          console.warn('Auth check timed out, unblocking UI...');
-          return false;
-        }
-        return false;
-      });
+      setLoading(false);
     }, 4000);
 
-    // Hardened listener using onIdTokenChanged to catch both initial session restoration
-    // and background token refreshes after >1 hour.
-    const unsubscribe = onIdTokenChanged(
-      auth,
-      async (currentUser) => {
+    // 2. Firebase Auth sync in background
+    const unsubscribe = auth.onAuthStateChanged(
+      (currentUser) => {
         clearTimeout(safetyTimeout);
         if (currentUser) {
-          try {
-            // Force token validation check without throwing unhandled exceptions
-            await currentUser.getIdToken(/* forceRefresh */ false);
-          } catch (tokenErr) {
-            console.warn('Silent token validation warning:', tokenErr);
-          }
-
+          const sessionData: StoredUser = {
+            uid: currentUser.uid,
+            email: currentUser.email,
+            displayName: currentUser.displayName,
+            photoURL: currentUser.photoURL,
+          };
           setUser(currentUser);
           try {
+            localStorage.setItem('invoiceflow_user_session', JSON.stringify(sessionData));
             localStorage.setItem('app_user_uid', currentUser.uid);
             localStorage.setItem('has_active_session', 'true');
           } catch {}
         } else {
-          // Check if user previously logged in and session is just restoring
+          // CRITICAL: Do NOT clear local session on transient background nulls
+          let saved: string | null = null;
           try {
-            const savedUid = localStorage.getItem('app_user_uid');
-            if (savedUid) {
-              console.log('Restoring session for user:', savedUid);
-            }
+            saved = localStorage.getItem('invoiceflow_user_session');
           } catch {}
-          setUser(null);
-          // CRITICAL: NEVER clear localStorage items (app_user_uid, has_active_session)
-          // automatically inside auth listener! ONLY clear them inside the user-triggered logout() function.
+
+          if (!saved) {
+            setUser(null);
+          } else {
+            console.log('Preserving offline-first session snapshot from localStorage');
+          }
         }
         setLoading(false);
       },
@@ -120,14 +141,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const isGoogleUser = Boolean(
-    user?.providerData?.some((p) => p.providerId === 'google.com')
+    user && 'providerData' in user && user.providerData?.some((p: any) => p?.providerId === 'google.com')
   );
 
   const loginWithGoogle = async (): Promise<User | null> => {
     const u = await firebaseLoginWithGoogle();
     if (u) {
+      const sessionData: StoredUser = {
+        uid: u.uid,
+        email: u.email,
+        displayName: u.displayName,
+        photoURL: u.photoURL,
+      };
       setUser(u);
       try {
+        localStorage.setItem('invoiceflow_user_session', JSON.stringify(sessionData));
         localStorage.setItem('app_user_uid', u.uid);
         localStorage.setItem('has_active_session', 'true');
       } catch {}
@@ -138,8 +166,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithEmail = async (email: string, pass: string): Promise<User | null> => {
     const u = await firebaseLoginWithEmail(email, pass);
     if (u) {
+      const sessionData: StoredUser = {
+        uid: u.uid,
+        email: u.email,
+        displayName: u.displayName,
+        photoURL: u.photoURL,
+      };
       setUser(u);
       try {
+        localStorage.setItem('invoiceflow_user_session', JSON.stringify(sessionData));
         localStorage.setItem('app_user_uid', u.uid);
         localStorage.setItem('has_active_session', 'true');
       } catch {}
@@ -150,8 +185,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const registerWithEmail = async (email: string, pass: string): Promise<User | null> => {
     const u = await firebaseRegisterWithEmail(email, pass);
     if (u) {
+      const sessionData: StoredUser = {
+        uid: u.uid,
+        email: u.email,
+        displayName: u.displayName,
+        photoURL: u.photoURL,
+      };
       setUser(u);
       try {
+        localStorage.setItem('invoiceflow_user_session', JSON.stringify(sessionData));
         localStorage.setItem('app_user_uid', u.uid);
         localStorage.setItem('has_active_session', 'true');
       } catch {}
@@ -171,13 +213,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return await firebaseVerifyUserCredentials(email, pass);
   };
 
-  // User-triggered logout function - ONLY place where local session markers are cleared
+  // 3. User ONLY logged out when clicking explicit Logout button
   const logout = async (): Promise<void> => {
     try {
+      localStorage.removeItem('invoiceflow_user_session');
       localStorage.removeItem('app_user_uid');
       localStorage.removeItem('has_active_session');
     } catch {}
     setUser(null);
+    try {
+      await auth.signOut();
+    } catch (err) {
+      console.error('SignOut Error:', err);
+    }
     await firebaseLogoutUser();
   };
 

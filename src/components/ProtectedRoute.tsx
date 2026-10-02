@@ -8,15 +8,14 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, fallback }) => {
-  const { user, loading, authLoading } = useAuth();
-  const isLoading = authLoading ?? loading;
+  const { user, loading } = useAuth();
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500 mx-auto mb-3"></div>
-          <p className="text-sm text-slate-400">Verifying session...</p>
+          <p className="text-sm text-slate-400">Loading InvoiceFlow...</p>
         </div>
       </div>
     );
