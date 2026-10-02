@@ -3,7 +3,6 @@ import {
   getAuth,
   setPersistence,
   browserLocalPersistence,
-  indexedDBLocalPersistence,
   browserPopupRedirectResolver,
   GoogleAuthProvider,
   EmailAuthProvider,
@@ -15,6 +14,7 @@ import {
   reauthenticateWithPopup,
   getRedirectResult,
   signOut,
+  onAuthStateChanged,
   onIdTokenChanged,
   User,
 } from 'firebase/auth';
@@ -39,17 +39,13 @@ export const firebaseConfig = {
   appId: "1:746068664458:web:0d8a81e9412c4693778d73"
 };
 
-// Initialize Firebase App
-export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Configure Firebase Auth with explicit LocalStorage persistence so sessions survive mobile PWA restarts & backgrounding
 export const auth = getAuth(app);
 
-// Force LocalStorage persistence as primary, falling back to IndexedDB if unavailable
-setPersistence(auth, browserLocalPersistence).catch(() => {
-  setPersistence(auth, indexedDBLocalPersistence).catch((err) => {
-    console.warn('Firebase persistence initialization warning:', err);
-  });
+// Ensure persistence is set immediately on module load
+setPersistence(auth, browserLocalPersistence).catch((err) => {
+  console.error("Firebase persistence error:", err);
 });
 
 export const db = getFirestore(app);
@@ -126,7 +122,6 @@ export const checkRedirectLogin = async (): Promise<User | null> => {
     const result = await getRedirectResult(auth, browserPopupRedirectResolver);
     return result?.user || null;
   } catch (error: any) {
-    // Silently ignore standard missing redirect or argument error in constrained web environments
     if (
       error?.code === 'auth/argument-error' ||
       error?.code === 'auth/no-auth-event' ||
@@ -144,6 +139,9 @@ export const checkRedirectLogin = async (): Promise<User | null> => {
  * Preserves permanent security settings (pwa_pin_*) and only clears active session flags.
  */
 export const logoutUser = async (): Promise<void> => {
+  try {
+    localStorage.removeItem('has_active_session');
+  } catch {}
   await signOut(auth);
   if (typeof sessionStorage !== 'undefined') {
     sessionStorage.removeItem('pwa_unlocked');

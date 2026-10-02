@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, onIdTokenChanged } from 'firebase/auth';
+import { User, onAuthStateChanged } from 'firebase/auth';
 import {
   auth,
   loginWithGoogle as firebaseLoginWithGoogle,
@@ -56,19 +56,23 @@ export function detectInAppBrowser(): boolean {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [isInAppBrowser, setIsInAppBrowser] = useState<boolean>(false);
 
   useEffect(() => {
     setIsInAppBrowser(detectInAppBrowser());
 
-    // Switch from onAuthStateChanged to onIdTokenChanged to handle silent token refreshes
-    // in background/mobile PWA without logging the user out.
-    // CRITICAL: Never call signOut() or clear localStorage/sessionStorage automatically on startup
-    // when currentUser is null. Session data must ONLY be cleared inside explicit user-initiated logout().
-    const unsubscribe = onIdTokenChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setAuthLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        try {
+          localStorage.setItem('has_active_session', 'true');
+        } catch {}
+      } else {
+        setUser(null);
+        // Only clear session marker if user explicitly clicked logout
+      }
+      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -79,15 +83,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   const loginWithGoogle = async (): Promise<User | null> => {
-    return await firebaseLoginWithGoogle();
+    const u = await firebaseLoginWithGoogle();
+    if (u) {
+      try {
+        localStorage.setItem('has_active_session', 'true');
+      } catch {}
+    }
+    return u;
   };
 
   const loginWithEmail = async (email: string, pass: string): Promise<User | null> => {
-    return await firebaseLoginWithEmail(email, pass);
+    const u = await firebaseLoginWithEmail(email, pass);
+    if (u) {
+      try {
+        localStorage.setItem('has_active_session', 'true');
+      } catch {}
+    }
+    return u;
   };
 
   const registerWithEmail = async (email: string, pass: string): Promise<User | null> => {
-    return await firebaseRegisterWithEmail(email, pass);
+    const u = await firebaseRegisterWithEmail(email, pass);
+    if (u) {
+      try {
+        localStorage.setItem('has_active_session', 'true');
+      } catch {}
+    }
+    return u;
   };
 
   const reauthenticateWithPassword = async (pass: string): Promise<boolean> => {
@@ -103,16 +125,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async (): Promise<void> => {
-    await firebaseLogoutUser();
+    try {
+      localStorage.removeItem('has_active_session');
+    } catch {}
     setUser(null);
+    await firebaseLogoutUser();
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        loading: authLoading,
-        authLoading,
+        loading,
+        authLoading: loading,
         isGoogleUser,
         loginWithGoogle,
         loginWithEmail,

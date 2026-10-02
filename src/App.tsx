@@ -638,34 +638,22 @@ function MainApp() {
   // ROUTE FLOW LOGIC ENFORCEMENT (States A, B, C, D)
   // ==========================================
 
-  // State A (authLoading === true): Show Full-Screen Splash / Loading Screen
-  if (authLoading) {
-    return (
-      <div className="fixed inset-0 z-50 min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white selection:bg-emerald-500 selection:text-white">
-        {/* Ambient glow */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-25">
-          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-500/30 rounded-full blur-3xl"></div>
-        </div>
+  // Check active session marker in localStorage to prevent premature login screen on refresh
+  const hasSession = typeof localStorage !== 'undefined' && localStorage.getItem('has_active_session') === 'true';
 
-        <div className="relative z-10 flex flex-col items-center">
-          <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-emerald-400 text-white flex items-center justify-center text-2xl shadow-xl shadow-emerald-950 mb-4 border border-emerald-300/30">
-            <i className="fa-solid fa-file-invoice"></i>
-            <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500"></span>
-            </span>
-          </div>
-          <div className="w-8 h-8 border-3 border-emerald-400 border-t-transparent rounded-full animate-spin mb-3"></div>
-          <h2 className="text-xl font-black tracking-tight text-white">InvoiceFlow</h2>
-          <p className="text-xs text-emerald-400 font-medium tracking-wide mt-1">
-            Restoring session...
-          </p>
+  // State A: Show Session Verification Screen while auth is loading or active session is being restored
+  if (authLoading || (hasSession && !currentUser)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500 mx-auto mb-3"></div>
+          <p className="text-sm text-slate-400">Verifying session...</p>
         </div>
       </div>
     );
   }
 
-  // State D (user === null AND authLoading === false): ONLY in this case show the Email/Password Login Screen
+  // State D (user === null AND authLoading === false AND !hasSession): ONLY in this case show the Email/Password Login Screen
   // Every single route requires an authenticated Firebase user (mandatory authentication)
   if (!currentUser) {
     return (
