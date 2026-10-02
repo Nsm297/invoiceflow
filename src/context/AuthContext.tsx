@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth';
+import { User, onIdTokenChanged } from 'firebase/auth';
 import {
   auth,
   loginWithGoogle as firebaseLoginWithGoogle,
@@ -73,20 +73,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }, 4000);
 
-    const unsubscribe = onAuthStateChanged(
+    // Hardened listener using onIdTokenChanged to catch both initial session restoration
+    // and background token refreshes after >1 hour.
+    const unsubscribe = onIdTokenChanged(
       auth,
-      (currentUser) => {
+      async (currentUser) => {
         clearTimeout(safetyTimeout);
         if (currentUser) {
+          try {
+            // Force token validation check without throwing unhandled exceptions
+            await currentUser.getIdToken(/* forceRefresh */ false);
+          } catch (tokenErr) {
+            console.warn('Silent token validation warning:', tokenErr);
+          }
+
           setUser(currentUser);
           try {
+            localStorage.setItem('app_user_uid', currentUser.uid);
             localStorage.setItem('has_active_session', 'true');
           } catch {}
         } else {
-          setUser(null);
+          // Check if user previously logged in and session is just restoring
           try {
-            localStorage.removeItem('has_active_session');
+            const savedUid = localStorage.getItem('app_user_uid');
+            if (savedUid) {
+              console.log('Restoring session for user:', savedUid);
+            }
           } catch {}
+          setUser(null);
+          // CRITICAL: NEVER clear localStorage items (app_user_uid, has_active_session)
+          // automatically inside auth listener! ONLY clear them inside the user-triggered logout() function.
         }
         setLoading(false);
       },
@@ -110,7 +126,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithGoogle = async (): Promise<User | null> => {
     const u = await firebaseLoginWithGoogle();
     if (u) {
+      setUser(u);
       try {
+        localStorage.setItem('app_user_uid', u.uid);
         localStorage.setItem('has_active_session', 'true');
       } catch {}
     }
@@ -120,7 +138,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithEmail = async (email: string, pass: string): Promise<User | null> => {
     const u = await firebaseLoginWithEmail(email, pass);
     if (u) {
+      setUser(u);
       try {
+        localStorage.setItem('app_user_uid', u.uid);
         localStorage.setItem('has_active_session', 'true');
       } catch {}
     }
@@ -130,7 +150,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const registerWithEmail = async (email: string, pass: string): Promise<User | null> => {
     const u = await firebaseRegisterWithEmail(email, pass);
     if (u) {
+      setUser(u);
       try {
+        localStorage.setItem('app_user_uid', u.uid);
         localStorage.setItem('has_active_session', 'true');
       } catch {}
     }
@@ -149,8 +171,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return await firebaseVerifyUserCredentials(email, pass);
   };
 
+  // User-triggered logout function - ONLY place where local session markers are cleared
   const logout = async (): Promise<void> => {
     try {
+      localStorage.removeItem('app_user_uid');
       localStorage.removeItem('has_active_session');
     } catch {}
     setUser(null);

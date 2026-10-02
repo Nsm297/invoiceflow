@@ -116,7 +116,7 @@ function MainApp() {
     setInvoices(getStoredInvoices());
     setBusinessInfo(getStoredBusinessInfo());
 
-    const uid = currentUser?.uid;
+    const uid = currentUser?.uid || (typeof localStorage !== 'undefined' ? localStorage.getItem('app_user_uid') || undefined : undefined);
     const sec = getStoredSecurityConfig(uid);
     setSecurityConfig(sec);
 

@@ -1,8 +1,9 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
+  initializeAuth,
   getAuth,
-  setPersistence,
   browserLocalPersistence,
+  indexedDBLocalPersistence,
   browserPopupRedirectResolver,
   GoogleAuthProvider,
   EmailAuthProvider,
@@ -41,12 +42,17 @@ export const firebaseConfig = {
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-export const auth = getAuth(app);
-
-// Ensure persistence is set immediately on module load
-setPersistence(auth, browserLocalPersistence).catch((err) => {
-  console.error("Firebase persistence error:", err);
-});
+// Synchronous auth initialization with fallback persistence array:
+// browserLocalPersistence (LocalStorage) first, indexedDBLocalPersistence second
+export const auth = (() => {
+  try {
+    return initializeAuth(app, {
+      persistence: [browserLocalPersistence, indexedDBLocalPersistence],
+    });
+  } catch {
+    return getAuth(app);
+  }
+})();
 
 export const db = getFirestore(app);
 
@@ -68,6 +74,12 @@ export interface CloudPayload {
  */
 export const loginWithEmail = async (email: string, pass: string): Promise<User | null> => {
   const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
+  if (cred.user) {
+    try {
+      localStorage.setItem('app_user_uid', cred.user.uid);
+      localStorage.setItem('has_active_session', 'true');
+    } catch {}
+  }
   return cred.user;
 };
 
@@ -76,6 +88,12 @@ export const loginWithEmail = async (email: string, pass: string): Promise<User 
  */
 export const registerWithEmail = async (email: string, pass: string): Promise<User | null> => {
   const cred = await createUserWithEmailAndPassword(auth, email.trim(), pass);
+  if (cred.user) {
+    try {
+      localStorage.setItem('app_user_uid', cred.user.uid);
+      localStorage.setItem('has_active_session', 'true');
+    } catch {}
+  }
   return cred.user;
 };
 
@@ -84,13 +102,13 @@ export const registerWithEmail = async (email: string, pass: string): Promise<Us
  */
 export const loginWithGoogle = async (): Promise<User | null> => {
   try {
-    await setPersistence(auth, browserLocalPersistence);
-  } catch (pErr) {
-    console.warn('Could not set LocalStorage persistence before popup login:', pErr);
-  }
-
-  try {
     const result = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
+    if (result.user) {
+      try {
+        localStorage.setItem('app_user_uid', result.user.uid);
+        localStorage.setItem('has_active_session', 'true');
+      } catch {}
+    }
     return result.user;
   } catch (error: any) {
     console.warn('Popup sign in error, attempting redirect fallback:', error);
@@ -120,6 +138,12 @@ export const checkRedirectLogin = async (): Promise<User | null> => {
     }
 
     const result = await getRedirectResult(auth, browserPopupRedirectResolver);
+    if (result?.user) {
+      try {
+        localStorage.setItem('app_user_uid', result.user.uid);
+        localStorage.setItem('has_active_session', 'true');
+      } catch {}
+    }
     return result?.user || null;
   } catch (error: any) {
     if (
@@ -140,6 +164,7 @@ export const checkRedirectLogin = async (): Promise<User | null> => {
  */
 export const logoutUser = async (): Promise<void> => {
   try {
+    localStorage.removeItem('app_user_uid');
     localStorage.removeItem('has_active_session');
   } catch {}
   await signOut(auth);
